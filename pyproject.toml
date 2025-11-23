@@ -1,0 +1,18 @@
+[project]
+name = "resume-claude-sdk-agent"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "chainlit>=2.9.2",
+    "claude-agent-sdk>=0.1.9",
+    "docx2pdf>=0.1.8",
+    "ipykernel>=7.1.0",
+    "pandas>=2.3.3",
+    "pydantic>=2.12.4",
+    "python-docx>=1.2.0",
+    "python-dotenv>=1.2.1",
+]
+
+
