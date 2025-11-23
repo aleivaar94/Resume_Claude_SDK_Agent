@@ -3,7 +3,7 @@ import json
 import re
 import chainlit as cl
 from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, create_sdk_mcp_server, AssistantMessage, TextBlock
-from tools import (
+from src.agent.tools import (
     scrape_job_tool, 
     get_candidate_profile_tool, 
     analyze_job_tool, 
