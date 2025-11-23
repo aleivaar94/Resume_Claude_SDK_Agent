@@ -3,8 +3,8 @@ import json
 from datetime import datetime
 from typing import Dict, Any, List
 from claude_agent_sdk import tool
-from brightdata import extract_job
-from resume_generator import (
+from src.integrations.brightdata import extract_job
+from src.core.resume_generator import (
     claude_analysis, 
     create_analysis_prompt,
     claude_resume, 
@@ -148,7 +148,7 @@ async def get_candidate_profile_tool(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     try:
         print("[get_candidate_profile_tool] Loading resume data...")
-        resume_data = load_resume_yaml('resume_ale.yaml')
+        resume_data = load_resume_yaml('data/resume_ale.yaml')
         print("[get_candidate_profile_tool] Success")
         return {
             "content": [

@@ -26,7 +26,7 @@ from docx2pdf import convert
 import pythoncom
 
 # BrightData script (for job scraping)
-from brightdata import extract_job
+from src.integrations.brightdata import extract_job
 
 # %%
 # Load Environment Variables
