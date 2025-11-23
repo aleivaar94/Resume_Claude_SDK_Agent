@@ -36,7 +36,7 @@ key = os.getenv("CLAUDE_API_KEY")
 if not key:
     raise ValueError("CLAUDE_API_KEY environment variable is required.")
 
-model_name = "claude-sonnet-4-5"
+model_name = "claude-haiku-4-5"
 
 # %%
 # Job Analysis Functions
@@ -534,22 +534,37 @@ print("Cover letter generation functions defined!")
 # %%
 # Document Creation Functions
 
-def create_resume_coverletter(resume, resume_ale, cover_letter, company, country: str = "Canada", language: str = "English"):
-    doc = Document()
+def _setup_document(language: str = "English") -> Document:
+    """
+    Initialize and configure a Word document with standard settings.
     
-    # Define section headers based on language
-    if language == "Spanish":
-        section_headers = {
-            "experience": "EXPERIENCIA",
-            "education": "EDUCACIÓN",
-            "continuing_studies": "EDUCACIÓN CONTINUA"
-        }
-    else:
-        section_headers = {
-            "experience": "EXPERIENCE",
-            "education": "EDUCATION",
-            "continuing_studies": "CONTINUING STUDIES"
-        }
+    This helper function creates a new document and applies global formatting
+    settings including margins, fonts, footer with page numbers, and header spacing.
+    
+    Parameters
+    ----------
+    language : str, optional
+        Language for document creation. Default is "English".
+        Currently only affects section headers in other functions.
+    
+    Returns
+    -------
+    Document
+        A configured python-docx Document object with standard formatting applied.
+    
+    Notes
+    -----
+    - Sets Helvetica font as default
+    - Margins: Top=0.3", Bottom=0.2", Left/Right=0.5"
+    - Adds right-aligned page number in footer
+    - Footer distance: 0.3", Header distance: 0.3"
+    
+    Examples
+    --------
+    >>> doc = _setup_document()
+    >>> # Document is ready for content addition
+    """
+    doc = Document()
     
     # Add footer with page number
     section = doc.sections[0]
@@ -581,9 +596,7 @@ def create_resume_coverletter(resume, resume_ale, cover_letter, company, country
     # Set header margins
     section.header_distance = Inches(0.3)
 
-    #----------------------------------------------#
     # GLOBAL DOCUMENT SETTINGS
-    
     style = doc.styles['Normal']
     style.font.name = 'Helvetica'
 
@@ -594,10 +607,68 @@ def create_resume_coverletter(resume, resume_ale, cover_letter, company, country
         section.bottom_margin = Inches(0.2)
         section.left_margin = Inches(0.5)
         section.right_margin = Inches(0.5)
+    
+    return doc
 
-    #----------------------------------------------#
-    # RESUME
 
+def _add_resume_section(doc: Document, resume: Dict[str, Any], resume_ale: Dict[str, Any], country: str = "Canada", language: str = "English") -> None:
+    """
+    Add resume content section to a Word document.
+    
+    This helper function adds a complete resume section including header with contact
+    information, professional summary, work experience, continuing studies, and education.
+    
+    Parameters
+    ----------
+    doc : Document
+        The python-docx Document object to add content to.
+    resume : Dict[str, Any]
+        Generated resume content dictionary with keys:
+        - professional_summary: str
+        - work_experience: List[Dict] with company, title, dates, bullet_points
+        - continuing_studies: List[Dict] with name, institution, completion_date
+        - education: List[Dict] with degree, institution, year_completed
+    resume_ale : Dict[str, Any]
+        Candidate's base resume data from YAML file containing personal_information.
+    country : str, optional
+        Country for phone number selection. Default is "Canada".
+        Options: "Canada" (778.223.8536) or "Mexico" (33.2505.0569).
+    language : str, optional
+        Language for section headers. Default is "English".
+        Options: "English" or "Spanish".
+    
+    Returns
+    -------
+    None
+        Modifies the document in-place.
+    
+    Notes
+    -----
+    - Header includes name (22pt, bold, centered) and contact info (10pt, blue)
+    - Professional summary is justified text
+    - Work experience uses tab stops for right-aligned dates
+    - Bullet points are indented 0.15 inches
+    - Section headers are centered and bold
+    
+    Examples
+    --------
+    >>> doc = _setup_document()
+    >>> _add_resume_section(doc, resume_data, base_data, country="Mexico", language="Spanish")
+    """
+    # Define section headers based on language
+    if language == "Spanish":
+        section_headers = {
+            "experience": "EXPERIENCIA",
+            "education": "EDUCACIÓN",
+            "continuing_studies": "EDUCACIÓN CONTINUA"
+        }
+    else:
+        section_headers = {
+            "experience": "EXPERIENCE",
+            "education": "EDUCATION",
+            "continuing_studies": "CONTINUING STUDIES"
+        }
+    
     # Name
     title = doc.add_paragraph()
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -626,7 +697,6 @@ def create_resume_coverletter(resume, resume_ale, cover_letter, company, country
     phone_run = contact.add_run(phone_number)
     phone_run.font.size = Pt(10)
     phone_run.font.color.rgb = RGBColor(23, 54, 93)
-
     
     # Professional summary
     summary = doc.add_paragraph()
@@ -713,17 +783,55 @@ def create_resume_coverletter(resume, resume_ale, cover_letter, company, country
         completion_date.italic = True
         completion_date.bold = True
 
-    # Add page break before cover letter
-    if doc.paragraphs:
-        last_para = doc.paragraphs[-1]
-        last_para.add_run().add_break(WD_BREAK.PAGE)
-    else:
-        # Only if there are no paragraphs (unlikely)
-        doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
-    #----------------------------------------------
-    # COVER LETTER
-
+def _add_cover_letter_section(doc: Document, cover_letter: Dict[str, Any], resume_ale: Dict[str, Any], company: str, country: str = "Canada", language: str = "English") -> None:
+    """
+    Add cover letter content section to a Word document.
+    
+    This helper function adds a complete cover letter section including header with
+    contact information, date, company name, greeting, and three content paragraphs.
+    
+    Parameters
+    ----------
+    doc : Document
+        The python-docx Document object to add content to.
+    cover_letter : Dict[str, Any]
+        Generated cover letter content dictionary with keys:
+        - opening_paragraph: str
+        - body_paragraph: str
+        - closing_paragraph: str
+    resume_ale : Dict[str, Any]
+        Candidate's base resume data from YAML file containing personal_information.
+    company : str
+        Company name for the cover letter recipient.
+    country : str, optional
+        Country for phone number selection. Default is "Canada".
+        Options: "Canada" (778.223.8536) or "Mexico" (33.2505.0569).
+    language : str, optional
+        Language for document content. Default is "English".
+        Note: Cover letter content language is determined during generation.
+    
+    Returns
+    -------
+    None
+        Modifies the document in-place.
+    
+    Notes
+    -----
+    - Header includes name (22pt, bold, centered) and contact info (10pt, blue)
+    - Date is right-aligned in "Month DD, YYYY" format
+    - Greeting uses "Dear Hiring Manager:"
+    - Three paragraphs: opening, body, closing (12pt spacing between)
+    - Signature includes "Sincerely," and candidate name
+    
+    Examples
+    --------
+    >>> doc = _setup_document()
+    >>> _add_cover_letter_section(doc, cover_letter_data, base_data, "Tech Corp", "Mexico")
+    """
+    # Determine phone number based on country
+    phone_number = "778.223.8536" if country == "Canada" else "33.2505.0569"
+    
     # Name
     title = doc.add_paragraph()
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -747,7 +855,6 @@ def create_resume_coverletter(resume, resume_ale, cover_letter, company, country
     github_run.font.size = Pt(10)
     github_run.font.color.rgb = RGBColor(23, 54, 93)
     separator_run = contact.add_run(' | ')
-    # Use the same phone number variable as above
     phone_run = contact.add_run(phone_number)
     phone_run.font.size = Pt(10)
     phone_run.font.color.rgb = RGBColor(23, 54, 93)
@@ -794,6 +901,181 @@ def create_resume_coverletter(resume, resume_ale, cover_letter, company, country
     signature = doc.add_paragraph()
     signature.alignment = WD_ALIGN_PARAGRAPH.LEFT
     signature.add_run('Sincerely,\n\nAlejandro Leiva')
+
+
+def create_resume_document(resume: Dict[str, Any], resume_ale: Dict[str, Any], country: str = "Canada", language: str = "English") -> Document:
+    """
+    Create a Word document containing only a resume.
+    
+    This function generates a single-page Word document with the candidate's resume,
+    including professional summary, work experience, continuing studies, and education.
+    
+    Parameters
+    ----------
+    resume : Dict[str, Any]
+        Generated resume content dictionary with keys:
+        - professional_summary: str
+        - work_experience: List[Dict] with company, title, dates, bullet_points
+        - continuing_studies: List[Dict] with name, institution, completion_date
+        - education: List[Dict] with degree, institution, year_completed
+    resume_ale : Dict[str, Any]
+        Candidate's base resume data from YAML file containing personal_information.
+    country : str, optional
+        Country for phone number selection. Default is "Canada".
+        Options: "Canada" or "Mexico".
+    language : str, optional
+        Language for section headers and content. Default is "English".
+        Options: "English" or "Spanish".
+    
+    Returns
+    -------
+    Document
+        A python-docx Document object containing the formatted resume.
+    
+    External Files Required
+    -----------------------
+    None. All data is passed as parameters.
+    
+    Examples
+    --------
+    Create a resume document for Canada in English:
+    
+    >>> doc = create_resume_document(resume_data, base_data)
+    >>> doc.save('resume.docx')
+    
+    Create a resume document for Mexico in Spanish:
+    
+    >>> doc = create_resume_document(resume_data, base_data, country="Mexico", language="Spanish")
+    >>> doc.save('curriculum.docx')
+    """
+    doc = _setup_document(language)
+    _add_resume_section(doc, resume, resume_ale, country, language)
+    return doc
+
+
+def create_cover_letter_document(cover_letter: Dict[str, Any], resume_ale: Dict[str, Any], company: str, country: str = "Canada", language: str = "English") -> Document:
+    """
+    Create a Word document containing only a cover letter.
+    
+    This function generates a single-page Word document with a tailored cover letter,
+    including header, date, company address, greeting, and content paragraphs.
+    
+    Parameters
+    ----------
+    cover_letter : Dict[str, Any]
+        Generated cover letter content dictionary with keys:
+        - opening_paragraph: str
+        - body_paragraph: str
+        - closing_paragraph: str
+    resume_ale : Dict[str, Any]
+        Candidate's base resume data from YAML file containing personal_information.
+    company : str
+        Company name for the cover letter recipient.
+    country : str, optional
+        Country for phone number selection. Default is "Canada".
+        Options: "Canada" or "Mexico".
+    language : str, optional
+        Language for document content. Default is "English".
+        Options: "English" or "Spanish".
+    
+    Returns
+    -------
+    Document
+        A python-docx Document object containing the formatted cover letter.
+    
+    External Files Required
+    -----------------------
+    None. All data is passed as parameters.
+    
+    Examples
+    --------
+    Create a cover letter document:
+    
+    >>> doc = create_cover_letter_document(cover_letter_data, base_data, "Tech Corp")
+    >>> doc.save('cover_letter.docx')
+    
+    Create a cover letter for Mexico:
+    
+    >>> doc = create_cover_letter_document(cover_letter_data, base_data, "Empresa SA", "Mexico", "Spanish")
+    >>> doc.save('carta_presentacion.docx')
+    """
+    doc = _setup_document(language)
+    _add_cover_letter_section(doc, cover_letter, resume_ale, company, country, language)
+    return doc
+
+
+def create_resume_coverletter(resume: Dict[str, Any], resume_ale: Dict[str, Any], cover_letter: Dict[str, Any], company: str, country: str = "Canada", language: str = "English") -> Document:
+    """
+    Create a Word document containing both resume and cover letter.
+    
+    This function generates a two-page Word document with the candidate's resume
+    on the first page and a tailored cover letter on the second page.
+    
+    Parameters
+    ----------
+    resume : Dict[str, Any]
+        Generated resume content dictionary with keys:
+        - professional_summary: str
+        - work_experience: List[Dict] with company, title, dates, bullet_points
+        - continuing_studies: List[Dict] with name, institution, completion_date
+        - education: List[Dict] with degree, institution, year_completed
+    resume_ale : Dict[str, Any]
+        Candidate's base resume data from YAML file containing personal_information.
+    cover_letter : Dict[str, Any]
+        Generated cover letter content dictionary with keys:
+        - opening_paragraph: str
+        - body_paragraph: str
+        - closing_paragraph: str
+    company : str
+        Company name for the cover letter recipient.
+    country : str, optional
+        Country for phone number selection. Default is "Canada".
+        Options: "Canada" or "Mexico".
+    language : str, optional
+        Language for section headers and content. Default is "English".
+        Options: "English" or "Spanish".
+    
+    Returns
+    -------
+    Document
+        A python-docx Document object containing both the resume and cover letter.
+    
+    External Files Required
+    -----------------------
+    None. All data is passed as parameters.
+    
+    Notes
+    -----
+    This function maintains backward compatibility with existing code that expects
+    a combined resume and cover letter document.
+    
+    Examples
+    --------
+    Create a complete application package:
+    
+    >>> doc = create_resume_coverletter(resume_data, base_data, cover_letter_data, "Tech Corp")
+    >>> doc.save('application.docx')
+    
+    Create documents for Mexico in Spanish:
+    
+    >>> doc = create_resume_coverletter(resume_data, base_data, cover_letter_data, "Empresa SA", "Mexico", "Spanish")
+    >>> doc.save('solicitud.docx')
+    """
+    # Setup document with standard formatting
+    doc = _setup_document(language)
+    
+    # Add resume section
+    _add_resume_section(doc, resume, resume_ale, country, language)
+    
+    # Add page break before cover letter
+    if doc.paragraphs:
+        last_para = doc.paragraphs[-1]
+        last_para.add_run().add_break(WD_BREAK.PAGE)
+    else:
+        doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
+    
+    # Add cover letter section
+    _add_cover_letter_section(doc, cover_letter, resume_ale, company, country, language)
     
     return doc
 

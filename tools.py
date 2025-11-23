@@ -11,7 +11,9 @@ from resume_generator import (
     create_resume_prompt,
     claude_cover_letter, 
     create_cover_letter_prompt,
-    create_resume_coverletter, 
+    create_resume_coverletter,
+    create_resume_document,
+    create_cover_letter_document,
     convert_word_to_pdf,
     load_resume_yaml
 )
@@ -94,6 +96,7 @@ async def scrape_job_tool(args: Dict[str, Any]) -> Dict[str, Any]:
     
     try:
         print(f"[scrape_job_tool] Extracting job from: {url}")
+        # Here the "_" is the a pandas dataframe of the job data (not used)
         job_dict, _ = extract_job(url, api_key)
         print(f"[scrape_job_tool] Success: {job_dict.get('job_title', 'N/A')} at {job_dict.get('company_name', 'N/A')}")
         return {
@@ -393,18 +396,19 @@ async def generate_cover_letter_content_tool(args: Dict[str, Any]) -> Dict[str, 
 
 @tool(
     "create_documents", 
-    "Create Word and PDF documents. Pass all JSON data as strings. Returns absolute file paths.", 
+    "Create Word and PDF documents. Supports 'both', 'resume_only', or 'cover_letter_only'. Pass all JSON data as strings. Returns absolute file paths.", 
     {
         "resume_generated_json": str, 
         "resume_original_json": str, 
         "cover_letter_generated_json": str, 
         "company": str, 
-        "job_title": str
+        "job_title": str,
+        "document_type": str
     }
 )
 async def create_documents_tool(args: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Creates Word and PDF documents containing the resume and cover letter.
+    Creates Word and PDF documents containing resume and/or cover letter.
     
     Parameters
     ----------
@@ -415,11 +419,16 @@ async def create_documents_tool(args: Dict[str, Any]) -> Dict[str, Any]:
         - resume_original_json : str
             JSON string of original resume data (for personal info).
         - cover_letter_generated_json : str
-            JSON string of generated cover letter.
+            JSON string of generated cover letter (optional for resume_only).
         - company : str
             Company name for filename.
         - job_title : str
             Job title for filename.
+        - document_type : str
+            Type of document to create. Options:
+            - "both" (default): Create resume + cover letter (2 pages)
+            - "resume_only": Create only resume (1 page)
+            - "cover_letter_only": Create only cover letter (1 page)
     
     Returns
     -------
@@ -430,23 +439,31 @@ async def create_documents_tool(args: Dict[str, Any]) -> Dict[str, Any]:
     -----
     Creates files in the 'output/' directory.
     Requires docx2pdf for PDF conversion (Windows only).
+    File naming includes document type suffix for single-document outputs.
     
     Examples
     --------
-    Output:
+    Output for resume_only:
     {
-        "message": "Documents created successfully.",
-        "word_path": "C:\\...\\output\\Alejandro_Leiva_Data_Scientist_Acme_2025_11_22.docx",
-        "pdf_path": "C:\\...\\output\\Alejandro_Leiva_Data_Scientist_Acme_2025_11_22.pdf"
+        "message": "Resume document created successfully.",
+        "word_path": "C:\\...\\output\\Alejandro_Leiva_Data_Scientist_Acme_Resume_2025_11_22.docx",
+        "pdf_path": "C:\\...\\output\\Alejandro_Leiva_Data_Scientist_Acme_Resume_2025_11_22.pdf"
     }
     """
     try:
-        print(f"[create_documents_tool] Creating documents for: {args['job_title']} at {args['company']}")
+        # Get document type (default to 'both')
+        document_type = args.get('document_type', 'both').lower()
+        
+        print(f"[create_documents_tool] Creating {document_type} for: {args['job_title']} at {args['company']}")
         
         # Parse JSON strings to dicts
         resume_generated = json.loads(args['resume_generated_json'])
         resume_original = json.loads(args['resume_original_json'])
-        cover_letter_generated = json.loads(args['cover_letter_generated_json'])
+        
+        # Cover letter is optional for resume_only
+        cover_letter_generated = None
+        if document_type in ['both', 'cover_letter_only']:
+            cover_letter_generated = json.loads(args['cover_letter_generated_json'])
         
         company = args['company']
         job_title = args['job_title']
@@ -460,15 +477,32 @@ async def create_documents_tool(args: Dict[str, Any]) -> Dict[str, Any]:
         safe_title = "".join([c for c in job_title if c.isalnum() or c in (' ', '_')]).strip().replace(' ', '_')
         safe_company = "".join([c for c in company if c.isalnum() or c in (' ', '_')]).strip().replace(' ', '_')
         
-        filename_base = f"Alejandro_Leiva_{safe_title}_{safe_company}_{today}"
+        # Add document type suffix to filename
+        type_suffix = ""
+        if document_type == "resume_only":
+            type_suffix = "_Resume"
+        elif document_type == "cover_letter_only":
+            type_suffix = "_CoverLetter"
+        
+        filename_base = f"Alejandro_Leiva_{safe_title}_{safe_company}{type_suffix}_{today}"
         doc_path = os.path.join(output_dir, f"{filename_base}.docx")
         
-        doc = create_resume_coverletter(
-            resume_generated, 
-            resume_original, 
-            cover_letter_generated, 
-            company
-        )
+        # Create document based on type
+        if document_type == "resume_only":
+            doc = create_resume_document(resume_generated, resume_original)
+            message = "Resume document created successfully."
+        elif document_type == "cover_letter_only":
+            doc = create_cover_letter_document(cover_letter_generated, resume_original, company)
+            message = "Cover letter document created successfully."
+        else:  # both
+            doc = create_resume_coverletter(
+                resume_generated, 
+                resume_original, 
+                cover_letter_generated, 
+                company
+            )
+            message = "Resume and cover letter documents created successfully."
+        
         doc.save(doc_path)
         print(f"[create_documents_tool] Word document saved: {doc_path}")
         
@@ -478,7 +512,8 @@ async def create_documents_tool(args: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "content": [
                 {"type": "text", "text": json.dumps({
-                    "message": "Documents created successfully.",
+                    "message": message,
+                    "document_type": document_type,
                     "word_path": os.path.abspath(doc_path),
                     "pdf_path": os.path.abspath(pdf_path)
                 }, indent=2)}
