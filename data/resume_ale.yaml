@@ -12,10 +12,10 @@ professional_summary:
     - "Detail-oriented"
     - "Proactive"
     - "Problem solver"
-    - "I'm always learning new methods in data science and analytics to improve my skills and stay up-to-date with industry trends"
-    - "One of the things that makes me stands out is that I know web scraping techniques to extract data from public sources"
-    - "I make a priority to get close to my stakeholders to understand their needs and deliver solutions that add value to their work"
-    - "I always take into consideration good visualization practices to communicate effectively with my audience."
+    - "Continuously learning new data science and analytics methods to stay current with industry trends."
+    - "Skilled in web scraping to extract data from public sources."
+    - "Collaborates closely with stakeholders to understand needs and deliver value."
+    - "Applies strong visualization best practices to communicate insights effectively."
 
 work_experience:
   - position: "Data Scientist II"
@@ -25,183 +25,92 @@ work_experience:
     location: "Vancouver, BC, Canada"
     industry: "Data Science/Government"
     achievements:
-      - metric: Enabled daily data updates instead of weekly manual exports.
-        description: Collaborated with operations and data engineering teams to gain direct access to the data warehouse, eliminating the need for manual CSV exports from Cognos Analytics. Designed and implemented an ETL workflow using SQL and Microsoft Fabric to automate data extraction and storage in a Lakehouse.
-        impact: Improved data availability for analytics and reporting, enabling faster and more informed decision-making across business units.
-      - metric:
-          value: "millions"
-          unit: "transactions"
-          type: "processed"
-        description: Designed and implemented a web scraping solution to extract Canadian import/export data from public portals. Developed an ETL pipeline using PySpark to process and store millions of transactions in a lakehouse on Microsoft Fabric.
-        impact: Enabled efficient big data analysis and improved data accessibility for analytics.
-      - metric:
-          value: "import food volumes"
-          unit: "changes"
-          type: "tracked"
-        description: Collaborated with import inspectors to design and develop a Power BI dashboard that tracked changes in imported food volumes.
-        impact: Provided actionable insights to inform policy decisions and mitigate the economic impact of global tariffs.
-      - metric:
-          value: 87
-          unit: "percent"
-          type: "accuracy"
-        description: Developed and deployed a machine learning time-series forecasting model to predict monthly import/export volumes based on historical data.
-        impact: Enhanced decision-making for seasonal resource planning, enabling better resource allocation and policy planning.
-      - metric:
-          value: 40
-          unit: "hours"
-          type: "time savings"
-          description: Developed and deployed a machine learning time-series forecasting model to predict monthly import/export volumes based on historical data.
-          impact: Reduced manual forecasting efforts per month through automation.
-      - metric:
-          value: 15
-          unit: "hours"
-          type: "time savings"
-        description: Automated data categorization using LLMs, reducing data cleaning time by 15+ hours per week.
-        impact: Streamlined data processing workflows and improved data quality through automated categorization.
-      - metric:
-          value: 4000000
-          unit: "CAD"
-          type: "cost savings"
-        description: Collaborated with food inspectors to translate business rules into a Python algorithmic solution to automatically select sampling plans, reducing manual work by 3 hours per inspector daily.
-        impact: Generated annual savings of $4M through automation and improved inspection efficiency.
+      - "Implemented daily automated data refreshes, replacing weekly manual CSV exports, by gaining direct data-warehouse access and building an ETL pipeline using SQL and Microsoft Fabric to store data in a Lakehouse."
+      - "Extracted and processed millions of import/export transactions by building web-scraping collectors and a PySpark ETL pipeline to load cleaned data into a Microsoft Fabric lakehouse."
+      - "Developed a Power BI dashboard to track changes in imported food volumes, collaborating with import inspectors to define metrics and design visualizations in Power BI for stakeholder use."
+      - "Developed and deployed a time-series forecasting model that achieved 87% accuracy in predicting monthly import/export volumes by training on historical data using Python and time-series ML techniques."
+      - "Automated forecasting and reduced manual effort by 40 hours per month by deploying the forecasting pipeline and scheduling automated runs using Python and Microsoft Fabric."
+      - "Automated data categorization, reducing data cleaning time by over 15 hours per week, by integrating LLM-based classification into the ETL pipeline."
+      - "Implemented a Python algorithm to automatically select sampling plans, reducing inspector manual work by 3 hours per inspector per day and generating approximately CAD 4,000,000 in annual savings by translating business rules into an automated algorithm."
 
   - position: "Data Scientist"
     company: "Canadian Food Inspection Agency"
-    start_date: "2023-12"
-    end_date: "2025-03"
+    start_date: "December-2023"
+    end_date: "March-2025"
     location: "Vancouver, BC, Canada"
     industry: "Data Science/Government"
     achievements:
-      - metric:
-          value: 86
-          unit: "percent"
-          type: "accuracy"
-        description: "Developed two machine learning models (anomaly detection + time-series forecasting) for predicting food safety risk prevalence"
-        impact: "Enhanced predictive capabilities for food safety risk management and inspection prioritization"
-      - metric:
-          value: 50
-          unit: "facilities"
-          type: "analysis scope"
-        description: "Analysed trends in pathogen occurrence and liaised with inspectors to implement preventive inspections"
-        impact: "Improved preventive food safety measures across facilities"
-      - metric:
-        description: "Developed descriptive and statistical analysis reports of domestic and imported food using Power BI"
-        impact: "Reduced report generation time and increased inspection efficiency by standardizing analysis across regions"
-      - metric:
-        description: Developed an unsupervised anomaly detection model to identify potential food safety risks in imported products.
-        impact: Enhanced risk assessment capabilities and improved inspection prioritization.
+      - "Developed and deployed anomaly-detection and time-series forecasting models achieving 86% accuracy in predicting food safety risk prevalence by training models on historical data using Python and ML techniques."
+      - "Analyzed pathogen occurrence trends across 50 facilities by performing statistical analysis with SQL and Power BI and collaborating with inspectors to implement preventive inspections."
+      - "Standardized descriptive and statistical reporting in Power BI, reducing report-generation time and improving inspection efficiency by creating templated reports and automated data queries."
+      - "Built an unsupervised anomaly detection model to identify potential food safety risks in imported products by training unsupervised ML models using Python and applying them to imported product datasets."
 
   - position: "Data Analyst"
     company: "Rubicon Organics"
-    start_date: "2023-03"
-    end_date: "2023-12"
+    start_date: "March-2023"
+    end_date: "December-2023"
     location: "Vancouver, BC, Canada"
-    industry: "CPG/Cannabis"
+    industry: "Data Science/CPG/Cannabis"
     achievements:
-      - metric:
-          value: 3
-          unit: "dashboards"
-          type: "development"
-        description: "Built Power BI dashboards in collaboration with sales and marketing for sales planning"
-        impact: "Enhanced sales planning and performance tracking capabilities"
-      - metric:
-          value: 8
-          unit: "hours"
-          type: "time savings"
-        description: "Developed ETL from five data sources totaling over 1M data points using SQL and Python"
-        impact: "Weekly time savings in data cleansing and analysis operations"
-      - metric:
-          value: 12
-          unit: "percent"
-          type: "increase"
-        description: "Designed and implemented a reporting tool to pinpoint SKU opportunities at store levels"
-        impact: "Increased product placement efficiency and boosted store-level sales through targeted SKU optimization"
+      - "Built three Power BI dashboards for sales and marketing by collaborating with stakeholders to define requirements and implementing interactive reports in Power BI."
+      - "Built an ETL pipeline integrating five data sources totaling over 1M records using SQL and Python, automating ingestion and cleaning and saving 8 hours weekly in data preparation."
+      - "Designed and implemented a reporting tool to pinpoint SKU opportunities at store level, contributing to a 12% increase in store-level sales by analyzing SKU performance with SQL and presenting results in Power BI."
 
   - position: "Quality Assurance Technician"
     company: "The Very Good Food Company"
-    start_date: "2021-02"
-    end_date: "2022-02"
+    start_date: "February-2021"
+    end_date: "February-2022"
     location: "Vancouver, BC, Canada"
     industry: "CPG/Food Manufacturing"
     achievements:
-      - metric:
-          value: 80
-          unit: "percent"
-          type: "score"
-        description: "Automated internal reporting of sanitation KPIs using MS Excel + MS Forms"
-        impact: "Secured passing score in SQF global food safety audit"
-      - description: "Coordinated with supply chain and production teams for food safety compliance"
-        impact: "Maintained operational continuity while ensuring safety standards"
-      - description: "Performed root cause analysis on non-conforming products and implemented corrective actions"
-        impact: "Cost savings through decreased rework requirements"
+      - "Automated sanitation KPI reporting using Excel and MS Forms, contributing to an 80% SQF audit score by building automated reports and forms to track sanitation metrics."
+      - "Coordinated supply chain and production teams to ensure food safety compliance by leading cross-functional meetings and implementing compliance checks, maintaining operational continuity."
+      - "Performed root cause analyses on non-conforming products, reducing rework and generating cost savings by applying corrective actions informed by statistical analysis in Excel."
 
   - position: "Quality Engineer"
     company: "IBM"
-    start_date: "2017-12"
-    end_date: "2018-10"
+    start_date: "December-2017"
+    end_date: "October-2018"
     location: "Guadalajara, Mexico"
-    industry: "Technology/Hardware Manufacturing"
+    industry: "Data Analysis/Technology/Hardware Manufacturing"
     achievements:
-      - metric:
-          value: 15
-          unit: "percent"
-          type: "reduction"
-          secondary_metric:
-            value: 110000
-            unit: "USD"
-            type: "cost savings"
-        description: "Reduced hard drive screw defects by 15% ($110,000 annual savings) using SQL for data extraction and cleaning of 50,000+ records, Excel for statistical analysis, and Agile Six Sigma methodologies for root cause identification"
-      - metric:
-          value: 40
-          unit: "percent"
-          type: "reduction"
-        description: "Developed Excel dashboard with automated SQL queries to extract and transform production data, reducing manual reporting time by 40% and enabling real-time quality monitoring for data-driven decision-making"
+      - "Reduced hard-drive screw defects by 15% (≈$110,000 annual savings) by extracting and cleaning 50,000+ records with SQL, performing statistical analysis in Excel, and applying Six Sigma root-cause methods."
+      - "Developed an Excel dashboard with automated SQL queries, reducing manual reporting time by 40% and enabling near-real-time quality monitoring by automating data extraction and transformation."
 
 education:
   degrees:
     - degree: "MSc in Food Science"
       institution: "University of British Columbia"
       country: "Canada"
-      start_date: "2019-01"
-      end_date: "2020-10"
-      gpa: null
-      
+      start_date: "January-2019"
+      end_date: "October-2020"
     - degree: "BSc in Biotechnology Engineering"
       institution: "Tec de Monterrey"
       country: "Mexico"
-      start_date: "2012-08"
-      end_date: "2017-05"
-      gpa: null
-
+      start_date: "August-2012"
+      end_date: "May-2017"
   continuing_studies:
     - name: "Business Analysis"
       institution: "UBC Sauder Continuing Business Studies"
-      completion_date: "2024-12"
-
+      completion_date: "December-2024"
     - name: "SEO"
       institution: "HubSpot Academy"
-      completion_date: "2023-12"
-      
+      completion_date: "December-2023"
     - name: "Social Media Marketing"
       institution: "Hootsuite Academy"
-      completion_date: "2023-12"
-
+      completion_date: "December-2023"
     - name: "Digital Marketing"
       institution: "Jelly Academy"
-      completion_date: "2023-12"
-
+      completion_date: "December-2023"
     - name: "Statistics for Data Analysis"
       institution: "BCIT - British Columbia Institute of Technology"
-      completion_date: "2023-12"
-      
+      completion_date: "December-2023"
     - name: "Data Scientist - Analytics & Machine Learning"
       institution: "Codecademy"
-      completion_date: "2022-12"
-
+      completion_date: "December-2022"
     - name: "Data Analyst"
-      institution: "Dataquest"   
-      completion_date: "2019-06"
-
+      institution: "Dataquest"
+      completion_date: "June-2019"
 
 skills:
   programming_languages:
@@ -209,11 +118,9 @@ skills:
     - "SQL"
     - "PySpark"
     - "T-SQL"
-  
   cloud_platforms:
     - "Azure"
     - "Google Cloud"
-  
   business_intelligence:
     - "Power BI"
     - "Microsoft Fabric"
@@ -222,11 +129,9 @@ skills:
     - "Power Pivot"
     - "Excel"
     - "Delta Lake"
-  
   methodologies:
     - "Agile"
     - "Six Sigma"
-  
   development_tools:
     - "Git"
     - "Docker"
