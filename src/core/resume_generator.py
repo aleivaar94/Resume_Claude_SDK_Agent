@@ -28,6 +28,11 @@ import pythoncom
 # BrightData script (for job scraping)
 from src.integrations.brightdata import extract_job
 
+# Vector store and embeddings
+from src.core.embeddings import OpenAIEmbeddings
+from src.core.vector_store import QdrantVectorStore
+from collections import defaultdict
+
 # %%
 # Load Environment Variables
 load_dotenv()
@@ -194,6 +199,294 @@ def load_resume_yaml(file_path: str) -> Dict[Any, Any]:
     with open(file_path, 'r') as file:
         resume_data = yaml.safe_load(file)
     return resume_data
+
+
+def retrieve_resume_context(job_analysis: Dict[str, Any] = None, top_k: int = 10) -> Dict[str, Any]:
+    """
+    Retrieve relevant resume context using RAG from vector database.
+    
+    This function queries the Qdrant vector store to retrieve the most relevant
+    resume information based on job requirements. It supports two modes:
+    1. Full retrieval (when job_analysis is None): Returns all resume data
+    2. Filtered retrieval (when job_analysis is provided): Returns only relevant chunks
+    
+    Parameters
+    ----------
+    job_analysis : Dict[str, Any], optional
+        Job analysis containing technical_skills, soft_skills, and keywords.
+        If None, retrieves all resume data.
+    top_k : int, optional
+        Maximum number of work achievements to retrieve (default: 10).
+    
+    Returns
+    -------
+    Dict[str, Any]
+        Reconstructed resume data matching YAML structure:
+        {
+            "personal_information": {...},
+            "professional_summary": {...},
+            "work_experience": [{company, position, dates, achievements}, ...],
+            "education": [{degree, institution, dates}, ...],
+            "continuing_studies": [{name, institution, completion_date}, ...],
+            "skills": {programming_languages: [...], ...}
+        }
+    
+    Notes
+    -----
+    - Groups retrieved achievements by job (company, position, dates)
+    - Maintains minimum of 2 achievements per job
+    - Filters out jobs with only 1 relevant achievement
+    
+    Examples
+    --------
+    >>> # Full retrieval (initial pass)
+    >>> resume = retrieve_resume_context()
+    >>> 
+    >>> # Filtered retrieval (after job analysis)
+    >>> job_analysis = {
+    ...     'technical_skills': ['Python', 'SQL', 'Power BI'],
+    ...     'soft_skills': ['collaboration', 'problem-solving'],
+    ...     'keywords': ['ETL', 'data pipeline', 'visualization']
+    ... }
+    >>> resume = retrieve_resume_context(job_analysis, top_k=10)
+    """
+    # Initialize embeddings and vector store
+    embedder = OpenAIEmbeddings()
+    store = QdrantVectorStore()
+    
+    # Construct query for filtered retrieval
+    if job_analysis:
+        query_parts = []
+        if job_analysis.get('technical_skills'):
+            query_parts.extend(job_analysis['technical_skills'])
+        if job_analysis.get('soft_skills'):
+            query_parts.extend(job_analysis['soft_skills'])
+        if job_analysis.get('keywords'):
+            query_parts.extend(job_analysis['keywords'])
+        
+        query_text = ' '.join(query_parts)
+        query_vector = embedder.embed_query(query_text)
+    else:
+        # For full retrieval, use a generic query
+        query_text = "data science analytics machine learning"
+        query_vector = embedder.embed_query(query_text)
+    
+    # Retrieve different sections with appropriate limits
+    
+    # Work experience achievements (filtered by relevance)
+    work_results = store.search(
+        query_vector=query_vector,
+        top_k=top_k if job_analysis else 100,  # Get all if no filter
+        section_filter="work_experience"
+    )
+    
+    # Education (get all)
+    education_results = store.search(
+        query_vector=query_vector,
+        top_k=10,
+        section_filter="education"
+    )
+    
+    # Skills (get all)
+    skills_results = store.search(
+        query_vector=query_vector,
+        top_k=20,
+        section_filter="skills"
+    )
+    
+    # Continuing studies
+    continuing_results = store.search(
+        query_vector=query_vector,
+        top_k=10 if job_analysis else 100,
+        section_filter="continuing_studies"
+    )
+    
+    # Personal info (get the one entry)
+    personal_results = store.search(
+        query_vector=query_vector,
+        top_k=1,
+        section_filter="personal_info"
+    )
+    
+    # Professional summary (get the one entry)
+    summary_results = store.search(
+        query_vector=query_vector,
+        top_k=1,
+        section_filter="professional_summary"
+    )
+    
+    # Reconstruct resume structure
+    resume_data = {
+        "personal_information": {},
+        "professional_summary": {"personality_traits": []},
+        "work_experience": [],
+        "education": {"degrees": [], "continuing_studies": []},
+        "skills": {}
+    }
+    
+    # Parse personal information
+    if personal_results:
+        # Extract from content (would need parsing, for now use metadata)
+        content = personal_results[0]['content']
+        lines = content.split('\n')
+        for line in lines:
+            if 'Email' in line:
+                email_match = re.search(r'([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})', line)
+                if email_match:
+                    resume_data['personal_information']['email'] = email_match.group(1)
+            if 'GitHub' in line:
+                github_match = re.search(r'https?://github\.com/[^\s|]+', line)
+                if github_match:
+                    resume_data['personal_information']['github'] = github_match.group(0)
+            if 'LinkedIn' in line:
+                linkedin_match = re.search(r'https?://[^\s|]+linkedin[^\s|]+', line)
+                if linkedin_match:
+                    resume_data['personal_information']['linkedin'] = linkedin_match.group(0)
+            if 'Languages' in line:
+                lang_match = re.search(r'Languages\*\*: (.+)', line)
+                if lang_match:
+                    resume_data['personal_information']['languages'] = lang_match.group(1).strip()
+            if 'Industry Experience' in line:
+                ind_match = re.search(r'Industry Experience\*\*: (.+)', line)
+                if ind_match:
+                    resume_data['personal_information']['Industry Experience'] = ind_match.group(1).strip()
+        
+        # Extract name from first line
+        name_match = re.match(r'# (.+)', lines[0])
+        if name_match:
+            resume_data['personal_information']['full_name'] = name_match.group(1).strip()
+    
+    # Professional summary
+    if summary_results:
+        content = summary_results[0]['content']
+        # Split into traits (sentences)
+        sentences = [s.strip() for s in content.split('.') if s.strip()]
+        resume_data['professional_summary']['personality_traits'] = sentences
+    
+    # Group work experience achievements by job
+    job_groups = defaultdict(lambda: {"achievements": [], "scores": []})
+    for result in work_results:
+        metadata = result['metadata']
+        job_key = (
+            metadata.get('company', ''),
+            metadata.get('position', ''),
+            metadata.get('start_date', ''),
+            metadata.get('end_date', '')
+        )
+        
+        job_groups[job_key]["achievements"].append(result['content'])
+        job_groups[job_key]["scores"].append(result['score'])
+        job_groups[job_key]["location"] = metadata.get('location', '')
+        job_groups[job_key]["industry"] = metadata.get('industry', '')
+    
+    # Filter jobs: Keep only jobs with at least 2 achievements
+    for job_key, job_data in job_groups.items():
+        if len(job_data["achievements"]) >= 2 or not job_analysis:  # Keep all in full retrieval
+            company, position, start_date, end_date = job_key
+            resume_data['work_experience'].append({
+                "position": position,
+                "company": company,
+                "start_date": start_date,
+                "end_date": end_date,
+                "location": job_data["location"],
+                "industry": job_data["industry"],
+                "achievements": job_data["achievements"]
+            })
+    
+    # Sort jobs by start date (most recent first)
+    resume_data['work_experience'].sort(
+        key=lambda x: x['start_date'],
+        reverse=True
+    )
+    
+    # Education
+    for result in education_results:
+        metadata = result['metadata']
+        resume_data['education']['degrees'].append({
+            "degree": metadata.get('degree', ''),
+            "institution": metadata.get('institution', ''),
+            "dates": metadata.get('dates', '')
+        })
+    
+    # Continuing studies
+    for result in continuing_results:
+        metadata = result['metadata']
+        resume_data['education']['continuing_studies'].append({
+            "name": metadata.get('name', ''),
+            "institution": metadata.get('institution', ''),
+            "completion_date": metadata.get('completion_date', '')
+        })
+    
+    # Skills (reconstruct by category)
+    for result in skills_results:
+        metadata = result['metadata']
+        category = metadata.get('category', 'other')
+        # Parse skills from content
+        content = result['content']
+        if ':' in content:
+            skills_text = content.split(':', 1)[1].strip()
+            skills_list = [s.strip() for s in skills_text.split(',')]
+            
+            # Convert category to snake_case key
+            category_key = category.lower().replace(' ', '_')
+            resume_data['skills'][category_key] = skills_list
+    
+    return resume_data
+
+
+def retrieve_personality_traits(job_analysis: Dict[str, Any], top_k: int = 5) -> str:
+    """
+    Retrieve relevant personality traits for cover letter enhancement.
+    
+    Parameters
+    ----------
+    job_analysis : Dict[str, Any]
+        Job analysis containing soft_skills and keywords.
+    top_k : int, optional
+        Number of personality traits to retrieve (default: 5).
+    
+    Returns
+    -------
+    str
+        Concatenated personality traits text.
+    
+    Examples
+    --------
+    >>> job_analysis = {
+    ...     'soft_skills': ['collaboration', 'problem-solving', 'communication'],
+    ...     'keywords': ['team player', 'analytical']
+    ... }
+    >>> traits = retrieve_personality_traits(job_analysis, top_k=5)
+    >>> print(traits)
+    """
+    # Initialize embeddings and vector store
+    embedder = OpenAIEmbeddings()
+    store = QdrantVectorStore()
+    
+    # Construct query from soft skills
+    query_parts = []
+    if job_analysis.get('soft_skills'):
+        query_parts.extend(job_analysis['soft_skills'])
+    if job_analysis.get('keywords'):
+        query_parts.extend(job_analysis['keywords'])
+    
+    query_text = ' '.join(query_parts) if query_parts else "personality traits"
+    query_vector = embedder.embed_query(query_text)
+    
+    # Retrieve personality and strength traits
+    results = store.search(
+        query_vector=query_vector,
+        top_k=top_k,
+        section_filter=None  # Will manually filter
+    )
+    
+    # Filter for personality/strength sections
+    personality_texts = []
+    for result in results:
+        if result['section_type'] in ['personality', 'strength']:
+            personality_texts.append(result['content'])
+    
+    return '\n\n'.join(personality_texts[:top_k])
 
 def create_resume_prompt(resume_data: Dict[str, Any], job_analysis: Dict[str, Any], job_title: str, company: str, job_description: str, language: str = "English", country: str = "Canada") -> str:
     language_instruction = ""

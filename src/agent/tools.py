@@ -15,7 +15,9 @@ from src.core.resume_generator import (
     create_resume_document,
     create_cover_letter_document,
     convert_word_to_pdf,
-    load_resume_yaml
+    load_resume_yaml,
+    retrieve_resume_context,
+    retrieve_personality_traits
 )
 
 # Helper to get API keys
@@ -115,12 +117,15 @@ async def scrape_job_tool(args: Dict[str, Any]) -> Dict[str, Any]:
 
 @tool(
     "get_candidate_profile", 
-    "Retrieve the candidate's resume profile data from resume_ale.yaml. Contains personal_information, work_experience, education, skills, etc.", 
+    "Retrieve the candidate's resume profile data using RAG from vector database. Contains personal_information, work_experience, education, skills, etc. Returns full resume data initially.", 
     {}
 )
 async def get_candidate_profile_tool(args: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Loads the candidate's base resume information from the YAML file.
+    Loads the candidate's base resume information using RAG retrieval.
+    
+    This tool performs initial full retrieval from the vector database,
+    returning all resume data without filtering.
     
     Parameters
     ----------
@@ -134,7 +139,8 @@ async def get_candidate_profile_tool(args: Dict[str, Any]) -> Dict[str, Any]:
         
     Notes
     -----
-    Requires external file: resume_ale.yaml in the project root directory.
+    Uses RAG to retrieve from Qdrant vector database.
+    Returns all resume data for initial context.
     
     Examples
     --------
@@ -147,9 +153,10 @@ async def get_candidate_profile_tool(args: Dict[str, Any]) -> Dict[str, Any]:
     }
     """
     try:
-        print("[get_candidate_profile_tool] Loading resume data...")
-        resume_data = load_resume_yaml('data/resume_ale.yaml')
-        print("[get_candidate_profile_tool] Success")
+        print("[get_candidate_profile_tool] Retrieving resume data from vector DB (full retrieval)...")
+        # Full retrieval without job filtering
+        resume_data = retrieve_resume_context(job_analysis=None)
+        print(f"[get_candidate_profile_tool] Success - Retrieved {len(resume_data.get('work_experience', []))} jobs")
         return {
             "content": [
                 {"type": "text", "text": json.dumps(resume_data, indent=2)}
@@ -160,6 +167,67 @@ async def get_candidate_profile_tool(args: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "content": [
                 {"type": "text", "text": f"Error loading resume profile: {str(e)}"}
+            ],
+            "is_error": True
+        }
+
+@tool(
+    "get_personality_traits",
+    "Retrieve relevant personality traits based on job soft skills to enhance cover letter. Pass job_analysis as JSON string.",
+    {"job_analysis_json": str}
+)
+async def get_personality_traits_tool(args: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Retrieves personality traits relevant to job requirements using RAG.
+    
+    Parameters
+    ----------
+    args : Dict[str, Any]
+        Dictionary containing:
+        - job_analysis_json : str
+            JSON string of job analysis from analyze_job tool.
+    
+    Returns
+    -------
+    Dict[str, Any]
+        MCP tool response containing personality traits text.
+    
+    Examples
+    --------
+    Input:
+    {"job_analysis_json": "{\"soft_skills\": [\"collaboration\", \"problem-solving\"]}"}
+    
+    Output:
+    {
+        "content": [{
+            "type": "text",
+            "text": "Innovative Mindset: My ability to see possibilities...\\n\\nIndependent Worker: ..."
+        }]
+    }
+    """
+    try:
+        print("[get_personality_traits_tool] Retrieving relevant personality traits...")
+        job_analysis = json.loads(args["job_analysis_json"])
+        personality_text = retrieve_personality_traits(job_analysis, top_k=5)
+        print(f"[get_personality_traits_tool] Success - Retrieved {len(personality_text.split('\\n\\n'))} traits")
+        return {
+            "content": [
+                {"type": "text", "text": personality_text}
+            ]
+        }
+    except json.JSONDecodeError as e:
+        print(f"[get_personality_traits_tool] JSON Parse Error: {str(e)}")
+        return {
+            "content": [
+                {"type": "text", "text": f"Error parsing JSON: {str(e)}"}
+            ],
+            "is_error": True
+        }
+    except Exception as e:
+        print(f"[get_personality_traits_tool] Error: {str(e)}")
+        return {
+            "content": [
+                {"type": "text", "text": f"Error retrieving personality traits: {str(e)}"}
             ],
             "is_error": True
         }

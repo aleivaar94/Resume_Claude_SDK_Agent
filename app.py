@@ -5,7 +5,8 @@ import chainlit as cl
 from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, create_sdk_mcp_server, AssistantMessage, TextBlock
 from src.agent.tools import (
     scrape_job_tool, 
-    get_candidate_profile_tool, 
+    get_candidate_profile_tool,
+    get_personality_traits_tool,
     analyze_job_tool, 
     generate_resume_content_tool, 
     generate_cover_letter_content_tool, 
@@ -22,7 +23,8 @@ resume_server = create_sdk_mcp_server(
     version="1.0.0",
     tools=[
         scrape_job_tool, 
-        get_candidate_profile_tool, 
+        get_candidate_profile_tool,
+        get_personality_traits_tool,
         analyze_job_tool, 
         generate_resume_content_tool, 
         generate_cover_letter_content_tool, 
@@ -38,22 +40,26 @@ You are an expert Resume AI Agent that generates tailored resumes and cover lett
 1. **scrape_job** - Extract job details from LinkedIn/Indeed URL
    Returns: job_title, company_name, job_summary/description_text
 
-2. **get_candidate_profile** - Load candidate's resume data from resume_ale.yaml
-   Returns: personal_information, work_experience, education, skills
+2. **get_candidate_profile** - Retrieve candidate's resume data using RAG from vector database
+   Returns: personal_information, work_experience, education, skills (full retrieval initially)
 
 3. **analyze_job** - Analyze job description to extract skills and keywords
    Input: job_title, company, job_description
    Returns: technical_skills, soft_skills, keywords
 
-4. **generate_resume_content** - Generate tailored resume content
+4. **get_personality_traits** - Retrieve relevant personality traits for cover letter
+   Input: job_analysis_json
+   Returns: personality traits text matching job soft skills
+
+5. **generate_resume_content** - Generate tailored resume content
    Input: resume_data_json, job_analysis_json, job_title, company, job_description
    Returns: professional_summary, work_experience, education, continuing_studies
 
-5. **generate_cover_letter_content** - Generate tailored cover letter
+6. **generate_cover_letter_content** - Generate tailored cover letter
    Input: resume_generated_json, job_analysis_json, job_title, company, job_description
    Returns: opening_paragraph, body_paragraph, closing_paragraph
 
-6. **create_documents** - Create Word and PDF documents
+7. **create_documents** - Create Word and PDF documents
    Input: resume_generated_json, resume_original_json, cover_letter_generated_json, company, job_title, document_type
    document_type options: "both" (default), "resume_only", "cover_letter_only"
    Returns: file paths to generated documents
@@ -62,11 +68,12 @@ You are an expert Resume AI Agent that generates tailored resumes and cover lett
 
 When a user provides a job URL:
 1. Use `scrape_job` to extract job information
-2. Use `get_candidate_profile` to load resume data
+2. Use `get_candidate_profile` to load resume data (full retrieval)
 3. Use `analyze_job` to identify key requirements
-4. Use `generate_resume_content` to create tailored resume
-5. Use `generate_cover_letter_content` to create tailored cover letter
-6. Use `create_documents` to create Word/PDF files
+4. Use `get_personality_traits` to retrieve relevant personality traits (optional for cover letter)
+5. Use `generate_resume_content` to create tailored resume
+6. Use `generate_cover_letter_content` to create tailored cover letter
+7. Use `create_documents` to create Word/PDF files
 
 ## FLEXIBLE BEHAVIOR - ADAPT TO USER REQUESTS
 
@@ -166,6 +173,7 @@ async def start():
         allowed_tools=[
             "mcp__resume_tools__scrape_job", 
             "mcp__resume_tools__get_candidate_profile",
+            "mcp__resume_tools__get_personality_traits",
             "mcp__resume_tools__analyze_job",
             "mcp__resume_tools__generate_resume_content",
             "mcp__resume_tools__generate_cover_letter_content",
