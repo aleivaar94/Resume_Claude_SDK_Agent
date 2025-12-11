@@ -382,10 +382,11 @@ async def generate_resume_content_tool(args: Dict[str, Any]) -> Dict[str, Any]:
 
 @tool(
     "generate_cover_letter_content", 
-    "Generate tailored cover letter. Pass resume_generated and job_analysis as JSON strings from previous tool outputs.", 
+    "Generate tailored cover letter. Pass resume_generated, job_analysis, and personality_traits as JSON strings from previous tool outputs.", 
     {
         "resume_generated_json": str, 
         "job_analysis_json": str, 
+        "personality_traits": str,
         "job_title": str, 
         "company": str, 
         "job_description": str
@@ -403,6 +404,8 @@ async def generate_cover_letter_content_tool(args: Dict[str, Any]) -> Dict[str, 
             JSON string of generated resume from generate_resume_content.
         - job_analysis_json : str
             JSON string of job analysis from analyze_job.
+        - personality_traits : str
+            Text string of personality traits from get_personality_traits.
         - job_title : str
             The job title.
         - company : str
@@ -430,13 +433,15 @@ async def generate_cover_letter_content_tool(args: Dict[str, Any]) -> Dict[str, 
         # Parse JSON strings to dicts
         resume_generated = json.loads(args['resume_generated_json'])
         job_analysis = json.loads(args['job_analysis_json'])
+        personality_traits = args.get('personality_traits', '')
         
         prompt = create_cover_letter_prompt(
             resume_generated,
             job_analysis,
             args['job_title'],
             args['company'],
-            args['job_description']
+            args['job_description'],
+            personality_traits
         )
         result = claude_cover_letter(get_claude_key(), prompt)
         print("[generate_cover_letter_content_tool] Success")

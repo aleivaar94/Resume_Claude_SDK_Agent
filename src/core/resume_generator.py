@@ -682,7 +682,7 @@ print("Resume generation functions defined!")
 # %%
 # Cover Letter Generation Functions
 
-def create_cover_letter_prompt(resume_data: Dict[str, Any], job_analysis: Dict[str, Any], job_title: str, company: str, job_description: str, language: str = "English") -> str:
+def create_cover_letter_prompt(resume_data: Dict[str, Any], job_analysis: Dict[str, Any], job_title: str, company: str, job_description: str, personality_traits: str = "", language: str = "English") -> str:
     language_instruction = ""
     if language == "Spanish":
         language_instruction = """
@@ -713,6 +713,11 @@ def create_cover_letter_prompt(resume_data: Dict[str, Any], job_analysis: Dict[s
     {company}
     </company>
 
+    Here are the candidate's relevant personality traits:
+    <personality_traits>
+    {personality_traits if personality_traits else "No specific personality traits provided."}
+    </personality_traits>
+
     Here are the relevant soft skills:
     <soft_skills>
     {json.dumps(job_analysis['soft_skills'])}
@@ -740,11 +745,12 @@ def create_cover_letter_prompt(resume_data: Dict[str, Any], job_analysis: Dict[s
     3. Tense: Present tense (except for past experiences)
     4. Language: Avoid "expert", "skilled", "seasoned", "excited"
     5. Opening: Attention-grabbing hook
-    6. Body: Highlight soft skills matching job requirements
+    6. Body: Highlight soft skills matching job requirements, naturally weave in relevant personality traits to demonstrate fit
     7. Closing: Explain how skills solve industry challenges
     8. Keywords: Naturally incorporate throughout
-    9. Relevance: Only use information from resume matching job requirements
-    10. Timeline: Accurately represent work experience dates
+    9. Personality: Use provided personality traits to strengthen the narrative and show cultural/role fit
+    10. Relevance: Only use information from resume matching job requirements
+    11. Timeline: Accurately represent work experience dates
 
     CRITICAL: Output ONLY a valid JSON object with this exact structure. No text before or after:
 
