@@ -45,16 +45,9 @@ model_name = "claude-haiku-4-5"
 
 # %%
 # Job Analysis Functions
-def create_analysis_prompt(job_title: str, company: str, job_description: str, language: str = "English") -> str:
-    language_instruction = ""
-    if language == "Spanish":
-        language_instruction = """
-        
-        IMPORTANT: Generate your analysis in Spanish. All skill names, keywords, and categories should be in Spanish.
-        """
-    
+def create_analysis_prompt(job_title: str, company: str, job_description: str) -> str:
     prompt_analysis = f"""
-    You are an experienced hiring manager tasked with analyzing job descriptions to extract key information. Your goal is to provide accurate and relevant data that can be used in the recruitment process.{language_instruction}
+    You are an experienced hiring manager tasked with analyzing job descriptions to extract key information. Your goal is to provide accurate and relevant data that can be used in the recruitment process.
 
     Here is the job information you need to analyze:
 
@@ -488,28 +481,9 @@ def retrieve_personality_traits(job_analysis: Dict[str, Any], top_k: int = 5) ->
     
     return '\n\n'.join(personality_texts[:top_k])
 
-def create_resume_prompt(resume_data: Dict[str, Any], job_analysis: Dict[str, Any], job_title: str, company: str, job_description: str, language: str = "English", country: str = "Canada") -> str:
-    language_instruction = ""
-    if language == "Spanish":
-        language_instruction = """
-        
-        CRITICAL: Generate the entire resume in Spanish. This includes:
-        - Professional summary in Spanish
-        - All job titles, company names, and bullet points in Spanish
-        - Education section in Spanish
-        - All field names and content must be in Spanish
-        """
-    
-    # Add Mexico-specific instructions for English fluency
-    mexico_instruction = ""
-    if country == "Mexico":
-        mexico_instruction = """
-        
-        In the professional summary, explicitly include that you speak fluent English. This is crucial for the Mexican job market where English proficiency is highly valued by employers.
-        """
-    
+def create_resume_prompt(resume_data: Dict[str, Any], job_analysis: Dict[str, Any], job_title: str, company: str, job_description: str) -> str:
     prompt_resume = f"""
-    You are an expert resume writer tasked with creating a highly targeted, achievement-based resume that aligns precisely with given job requirements while accurately representing a candidate's experience.{language_instruction}{mexico_instruction}
+    You are an expert resume writer tasked with creating a highly targeted, achievement-based resume that aligns precisely with given job requirements while accurately representing a candidate's experience.
 
     First, review the following information carefully:
 
@@ -566,7 +540,6 @@ def create_resume_prompt(resume_data: Dict[str, Any], job_analysis: Dict[str, An
        - DO use exact terminology from resume when possible
        - DO focus on demonstrable experience and concrete technologies
        - DO incorporate keywords from job ONLY if they appear in resume data
-       {f"- DO include 'fluent English' or 'English proficiency'" if country == "Mexico" else ""}
        
        If a job requirement has no match in resume, omit it from summary.
     
@@ -682,16 +655,9 @@ print("Resume generation functions defined!")
 # %%
 # Cover Letter Generation Functions
 
-def create_cover_letter_prompt(resume_data: Dict[str, Any], job_analysis: Dict[str, Any], job_title: str, company: str, job_description: str, personality_traits: str = "", language: str = "English") -> str:
-    language_instruction = ""
-    if language == "Spanish":
-        language_instruction = """
-        
-        CRITICAL: Generate the entire cover letter in Spanish. All content, including greetings, body paragraphs, and closing must be in Spanish. Use proper Spanish business letter format and tone.
-        """
-    
+def create_cover_letter_prompt(resume_data: Dict[str, Any], job_analysis: Dict[str, Any], job_title: str, company: str, job_description: str, personality_traits: str = "") -> str:
     prompt_cover_letter = f"""
-    You are an expert cover letter writer specializing in achievement-based writing and keyword optimization.{language_instruction} 
+    You are an expert cover letter writer specializing in achievement-based writing and keyword optimization. 
 
     Here is the job description:
     <job_description>
@@ -833,7 +799,7 @@ print("Cover letter generation functions defined!")
 # %%
 # Document Creation Functions
 
-def _setup_document(language: str = "English") -> Document:
+def _setup_document() -> Document:
     """
     Initialize and configure a Word document with standard settings.
     
@@ -842,9 +808,7 @@ def _setup_document(language: str = "English") -> Document:
     
     Parameters
     ----------
-    language : str, optional
-        Language for document creation. Default is "English".
-        Currently only affects section headers in other functions.
+    None
     
     Returns
     -------
@@ -910,7 +874,7 @@ def _setup_document(language: str = "English") -> Document:
     return doc
 
 
-def _add_resume_section(doc: Document, resume: Dict[str, Any], resume_ale: Dict[str, Any], country: str = "Canada", language: str = "English") -> None:
+def _add_resume_section(doc: Document, resume: Dict[str, Any], resume_ale: Dict[str, Any]) -> None:
     """
     Add resume content section to a Word document.
     
@@ -929,12 +893,6 @@ def _add_resume_section(doc: Document, resume: Dict[str, Any], resume_ale: Dict[
         - education: List[Dict] with degree, institution, year_completed
     resume_ale : Dict[str, Any]
         Candidate's base resume data from YAML file containing personal_information.
-    country : str, optional
-        Country for phone number selection. Default is "Canada".
-        Options: "Canada" (778.223.8536) or "Mexico" (33.2505.0569).
-    language : str, optional
-        Language for section headers. Default is "English".
-        Options: "English" or "Spanish".
     
     Returns
     -------
@@ -948,26 +906,13 @@ def _add_resume_section(doc: Document, resume: Dict[str, Any], resume_ale: Dict[
     - Work experience uses tab stops for right-aligned dates
     - Bullet points are indented 0.15 inches
     - Section headers are centered and bold
+    - Phone number: 778.223.8536
     
     Examples
     --------
     >>> doc = _setup_document()
-    >>> _add_resume_section(doc, resume_data, base_data, country="Mexico", language="Spanish")
+    >>> _add_resume_section(doc, resume_data, base_data)
     """
-    # Define section headers based on language
-    if language == "Spanish":
-        section_headers = {
-            "experience": "EXPERIENCIA",
-            "education": "EDUCACIÓN",
-            "continuing_studies": "EDUCACIÓN CONTINUA"
-        }
-    else:
-        section_headers = {
-            "experience": "EXPERIENCE",
-            "education": "EDUCATION",
-            "continuing_studies": "CONTINUING STUDIES"
-        }
-    
     # Name
     title = doc.add_paragraph()
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -991,9 +936,7 @@ def _add_resume_section(doc: Document, resume: Dict[str, Any], resume_ale: Dict[
     github_run.font.size = Pt(10)
     github_run.font.color.rgb = RGBColor(23, 54, 93)
     separator_run = contact.add_run(' | ')
-    # Determine phone number based on country
-    phone_number = "778.223.8536" if country == "Canada" else "33.2505.0569"
-    phone_run = contact.add_run(phone_number)
+    phone_run = contact.add_run("778.223.8536")
     phone_run.font.size = Pt(10)
     phone_run.font.color.rgb = RGBColor(23, 54, 93)
     
@@ -1006,7 +949,7 @@ def _add_resume_section(doc: Document, resume: Dict[str, Any], resume_ale: Dict[
     # Experience
     exp_header = doc.add_paragraph()
     exp_header.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-    exp_header.add_run(section_headers["experience"]).bold = True
+    exp_header.add_run("EXPERIENCE").bold = True
     exp_header.paragraph_format.space_after = Pt(0)
     
     # Set up the tab stop for right-aligned dates
@@ -1041,7 +984,7 @@ def _add_resume_section(doc: Document, resume: Dict[str, Any], resume_ale: Dict[
     # Add Continuing Studies section
     cont_header = doc.add_paragraph()
     cont_header.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    cont_header.add_run(section_headers["continuing_studies"]).bold = True
+    cont_header.add_run("CONTINUING STUDIES").bold = True
     cont_header.paragraph_format.space_before = Pt(10)
     cont_header.paragraph_format.space_after = Pt(0)
 
@@ -1063,7 +1006,7 @@ def _add_resume_section(doc: Document, resume: Dict[str, Any], resume_ale: Dict[
     # Add Education section
     edu_header = doc.add_paragraph()
     edu_header.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    edu_header.add_run(section_headers["education"]).bold = True
+    edu_header.add_run("EDUCATION").bold = True
     edu_header.paragraph_format.space_before = Pt(10)
     edu_header.paragraph_format.space_after = Pt(0)
     
@@ -1083,7 +1026,7 @@ def _add_resume_section(doc: Document, resume: Dict[str, Any], resume_ale: Dict[
         completion_date.bold = True
 
 
-def _add_cover_letter_section(doc: Document, cover_letter: Dict[str, Any], resume_ale: Dict[str, Any], company: str, country: str = "Canada", language: str = "English") -> None:
+def _add_cover_letter_section(doc: Document, cover_letter: Dict[str, Any], resume_ale: Dict[str, Any], company: str) -> None:
     """
     Add cover letter content section to a Word document.
     
@@ -1103,12 +1046,6 @@ def _add_cover_letter_section(doc: Document, cover_letter: Dict[str, Any], resum
         Candidate's base resume data from YAML file containing personal_information.
     company : str
         Company name for the cover letter recipient.
-    country : str, optional
-        Country for phone number selection. Default is "Canada".
-        Options: "Canada" (778.223.8536) or "Mexico" (33.2505.0569).
-    language : str, optional
-        Language for document content. Default is "English".
-        Note: Cover letter content language is determined during generation.
     
     Returns
     -------
@@ -1122,15 +1059,13 @@ def _add_cover_letter_section(doc: Document, cover_letter: Dict[str, Any], resum
     - Greeting uses "Dear Hiring Manager:"
     - Three paragraphs: opening, body, closing (12pt spacing between)
     - Signature includes "Sincerely," and candidate name
+    - Phone number: 778.223.8536
     
     Examples
     --------
     >>> doc = _setup_document()
-    >>> _add_cover_letter_section(doc, cover_letter_data, base_data, "Tech Corp", "Mexico")
+    >>> _add_cover_letter_section(doc, cover_letter_data, base_data, "Tech Corp")
     """
-    # Determine phone number based on country
-    phone_number = "778.223.8536" if country == "Canada" else "33.2505.0569"
-    
     # Name
     title = doc.add_paragraph()
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -1154,7 +1089,7 @@ def _add_cover_letter_section(doc: Document, cover_letter: Dict[str, Any], resum
     github_run.font.size = Pt(10)
     github_run.font.color.rgb = RGBColor(23, 54, 93)
     separator_run = contact.add_run(' | ')
-    phone_run = contact.add_run(phone_number)
+    phone_run = contact.add_run("778.223.8536")
     phone_run.font.size = Pt(10)
     phone_run.font.color.rgb = RGBColor(23, 54, 93)
 
@@ -1202,7 +1137,7 @@ def _add_cover_letter_section(doc: Document, cover_letter: Dict[str, Any], resum
     signature.add_run('Sincerely,\n\nAlejandro Leiva')
 
 
-def create_resume_document(resume: Dict[str, Any], resume_ale: Dict[str, Any], country: str = "Canada", language: str = "English") -> Document:
+def create_resume_document(resume: Dict[str, Any], resume_ale: Dict[str, Any]) -> Document:
     """
     Create a Word document containing only a resume.
     
@@ -1219,12 +1154,6 @@ def create_resume_document(resume: Dict[str, Any], resume_ale: Dict[str, Any], c
         - education: List[Dict] with degree, institution, year_completed
     resume_ale : Dict[str, Any]
         Candidate's base resume data from YAML file containing personal_information.
-    country : str, optional
-        Country for phone number selection. Default is "Canada".
-        Options: "Canada" or "Mexico".
-    language : str, optional
-        Language for section headers and content. Default is "English".
-        Options: "English" or "Spanish".
     
     Returns
     -------
@@ -1237,22 +1166,17 @@ def create_resume_document(resume: Dict[str, Any], resume_ale: Dict[str, Any], c
     
     Examples
     --------
-    Create a resume document for Canada in English:
+    Create a resume document:
     
     >>> doc = create_resume_document(resume_data, base_data)
     >>> doc.save('resume.docx')
-    
-    Create a resume document for Mexico in Spanish:
-    
-    >>> doc = create_resume_document(resume_data, base_data, country="Mexico", language="Spanish")
-    >>> doc.save('curriculum.docx')
     """
-    doc = _setup_document(language)
-    _add_resume_section(doc, resume, resume_ale, country, language)
+    doc = _setup_document()
+    _add_resume_section(doc, resume, resume_ale)
     return doc
 
 
-def create_cover_letter_document(cover_letter: Dict[str, Any], resume_ale: Dict[str, Any], company: str, country: str = "Canada", language: str = "English") -> Document:
+def create_cover_letter_document(cover_letter: Dict[str, Any], resume_ale: Dict[str, Any], company: str) -> Document:
     """
     Create a Word document containing only a cover letter.
     
@@ -1270,12 +1194,6 @@ def create_cover_letter_document(cover_letter: Dict[str, Any], resume_ale: Dict[
         Candidate's base resume data from YAML file containing personal_information.
     company : str
         Company name for the cover letter recipient.
-    country : str, optional
-        Country for phone number selection. Default is "Canada".
-        Options: "Canada" or "Mexico".
-    language : str, optional
-        Language for document content. Default is "English".
-        Options: "English" or "Spanish".
     
     Returns
     -------
@@ -1292,18 +1210,13 @@ def create_cover_letter_document(cover_letter: Dict[str, Any], resume_ale: Dict[
     
     >>> doc = create_cover_letter_document(cover_letter_data, base_data, "Tech Corp")
     >>> doc.save('cover_letter.docx')
-    
-    Create a cover letter for Mexico:
-    
-    >>> doc = create_cover_letter_document(cover_letter_data, base_data, "Empresa SA", "Mexico", "Spanish")
-    >>> doc.save('carta_presentacion.docx')
     """
-    doc = _setup_document(language)
-    _add_cover_letter_section(doc, cover_letter, resume_ale, company, country, language)
+    doc = _setup_document()
+    _add_cover_letter_section(doc, cover_letter, resume_ale, company)
     return doc
 
 
-def create_resume_coverletter(resume: Dict[str, Any], resume_ale: Dict[str, Any], cover_letter: Dict[str, Any], company: str, country: str = "Canada", language: str = "English") -> Document:
+def create_resume_coverletter(resume: Dict[str, Any], resume_ale: Dict[str, Any], cover_letter: Dict[str, Any], company: str) -> Document:
     """
     Create a Word document containing both resume and cover letter.
     
@@ -1327,12 +1240,6 @@ def create_resume_coverletter(resume: Dict[str, Any], resume_ale: Dict[str, Any]
         - closing_paragraph: str
     company : str
         Company name for the cover letter recipient.
-    country : str, optional
-        Country for phone number selection. Default is "Canada".
-        Options: "Canada" or "Mexico".
-    language : str, optional
-        Language for section headers and content. Default is "English".
-        Options: "English" or "Spanish".
     
     Returns
     -------
@@ -1354,17 +1261,12 @@ def create_resume_coverletter(resume: Dict[str, Any], resume_ale: Dict[str, Any]
     
     >>> doc = create_resume_coverletter(resume_data, base_data, cover_letter_data, "Tech Corp")
     >>> doc.save('application.docx')
-    
-    Create documents for Mexico in Spanish:
-    
-    >>> doc = create_resume_coverletter(resume_data, base_data, cover_letter_data, "Empresa SA", "Mexico", "Spanish")
-    >>> doc.save('solicitud.docx')
     """
     # Setup document with standard formatting
-    doc = _setup_document(language)
+    doc = _setup_document()
     
     # Add resume section
-    _add_resume_section(doc, resume, resume_ale, country, language)
+    _add_resume_section(doc, resume, resume_ale)
     
     # Add page break before cover letter
     if doc.paragraphs:
@@ -1374,7 +1276,7 @@ def create_resume_coverletter(resume: Dict[str, Any], resume_ale: Dict[str, Any]
         doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
     
     # Add cover letter section
-    _add_cover_letter_section(doc, cover_letter, resume_ale, company, country, language)
+    _add_cover_letter_section(doc, cover_letter, resume_ale, company)
     
     return doc
 
