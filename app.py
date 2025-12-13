@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import asyncio
 import chainlit as cl
 from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, create_sdk_mcp_server, AssistantMessage, TextBlock
 from src.agent.tools import (
@@ -193,10 +194,21 @@ async def end():
     
     This function properly closes the Claude SDK client and releases
     any associated resources.
+    
+    Notes
+    -----
+    Uses shield() to protect cleanup from task cancellation.
     """
     client = cl.user_session.get("client")
     if client:
-        await client.__aexit__(None, None, None)
+        try:
+            # Shield the cleanup from cancellation
+            await asyncio.shield(client.__aexit__(None, None, None))
+        except asyncio.CancelledError:
+            # If still cancelled, force close without waiting
+            pass
+        except Exception as e:
+            print(f"Error during client cleanup: {e}")
 
 @cl.on_message
 async def main(message: cl.Message):
@@ -236,10 +248,14 @@ async def main(message: cl.Message):
                         text = block.text
                         await msg.stream_token(text)
                         full_response += text
+    except asyncio.CancelledError:
+        # Handle graceful shutdown
+        await msg.stream_token("\n\n⚠️ Request was cancelled.")
+        raise
     except Exception as e:
-        await msg.stream_token(f"\\n\\nError: {str(e)}")
-    
-    await msg.update()
+        await msg.stream_token(f"\n\n❌ Error: {str(e)}")
+    finally:
+        await msg.update()
 
     # Check for file paths in the response to create download buttons
     elements = []
