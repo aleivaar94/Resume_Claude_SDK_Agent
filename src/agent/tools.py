@@ -154,8 +154,8 @@ async def get_candidate_profile_tool(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     try:
         print("[get_candidate_profile_tool] Retrieving resume data from vector DB (full retrieval)...")
-        # Full retrieval without job filtering
-        resume_data = retrieve_resume_context(job_analysis=None)
+        # Full retrieval without job filtering - call with no arguments
+        resume_data = retrieve_resume_context()
         print(f"[get_candidate_profile_tool] Success - Retrieved {len(resume_data.get('work_experience', []))} jobs")
         return {
             "content": [
