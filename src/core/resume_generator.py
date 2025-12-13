@@ -188,10 +188,10 @@ def format_claude_analysis_response(skills_dict):
 # %%
 # Resume Generation Functions
 
-def load_resume_yaml(file_path: str) -> Dict[Any, Any]:
-    with open(file_path, 'r') as file:
-        resume_data = yaml.safe_load(file)
-    return resume_data
+# def load_resume_yaml(file_path: str) -> Dict[Any, Any]:
+#     with open(file_path, 'r') as file:
+#         resume_data = yaml.safe_load(file)
+#     return resume_data
 
 
 def retrieve_resume_context(

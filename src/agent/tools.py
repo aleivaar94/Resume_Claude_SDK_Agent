@@ -15,7 +15,7 @@ from src.core.resume_generator import (
     create_resume_document,
     create_cover_letter_document,
     convert_word_to_pdf,
-    load_resume_yaml,
+    # load_resume_yaml,
     retrieve_resume_context,
     retrieve_personality_traits
 )
