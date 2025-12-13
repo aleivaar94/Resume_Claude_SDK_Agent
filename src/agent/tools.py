@@ -354,7 +354,8 @@ async def generate_resume_content_tool(args: Dict[str, Any]) -> Dict[str, Any]:
             job_title=args['job_title'],
             company=args['company'],
             job_description=args['job_description'],
-            top_k=10
+            top_k_achievements=10,
+            top_k_jobs=3
         )
         print(f"[generate_resume_content_tool] Retrieved {len(resume_data.get('work_experience', []))} relevant jobs")
         

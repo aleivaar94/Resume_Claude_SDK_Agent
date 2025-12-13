@@ -198,7 +198,8 @@ def retrieve_resume_context(
     job_title: Optional[str] = None, 
     company: Optional[str] = None, 
     job_description: Optional[str] = None, 
-    top_k: int = 10
+    top_k_achievements: int = 10,
+    top_k_jobs: int = 3
 ) -> Dict[str, Any]:
     """
     Retrieve relevant resume context using RAG from vector database.
@@ -208,6 +209,13 @@ def retrieve_resume_context(
     1. Full retrieval (when job info is None): Returns all resume data
     2. Filtered retrieval (when job info is provided): Returns only relevant chunks
     
+    Strategy:
+    - Retrieves a pool of relevant achievements (top_k_achievements)
+    - Groups achievements by job (company + position + dates)
+    - Ranks jobs by average similarity score
+    - Selects top N most relevant jobs (top_k_jobs)
+    - Returns ALL achievements for the selected jobs
+    
     Parameters
     ----------
     job_title : str, optional
@@ -216,8 +224,10 @@ def retrieve_resume_context(
         Company name (context for search).
     job_description : str, optional
         Full job description text for semantic search.
-    top_k : int, optional
-        Maximum number of work achievements to retrieve (default: 10).
+    top_k_achievements : int, optional
+        Number of achievements to retrieve for ranking (default: 10).
+    top_k_jobs : int, optional
+        Number of most relevant jobs to include (default: 3).
     
     Returns
     -------
@@ -234,9 +244,8 @@ def retrieve_resume_context(
     
     Notes
     -----
-    - Groups retrieved achievements by job (company, position, dates)
-    - Maintains minimum of 2 achievements per job
-    - Filters out jobs with only 1 relevant achievement
+    - Ranks jobs by average similarity score of their achievements
+    - Returns ALL achievements for top-ranked jobs (no filtering)
     - Uses semantic search on full job information for better matching
     
     Examples
@@ -248,7 +257,9 @@ def retrieve_resume_context(
     >>> resume = retrieve_resume_context(
     ...     job_title="Data Scientist",
     ...     company="Acme Corp",
-    ...     job_description="We need Python expertise for ETL pipelines..."
+    ...     job_description="We need Python expertise for ETL pipelines...",
+    ...     top_k_achievements=10,
+    ...     top_k_jobs=3
     ... )
     """
     # Initialize embeddings and vector store
@@ -279,7 +290,7 @@ def retrieve_resume_context(
     # Work experience achievements (filtered by relevance)
     work_results = store.search(
         query_vector=query_vector,
-        top_k=top_k if use_filtering else 100,  # Get all if no filter
+        top_k=top_k_achievements if use_filtering else 100,  # Get all if no filter
         section_filter="work_experience"
     )
     
@@ -367,7 +378,7 @@ def retrieve_resume_context(
         resume_data['professional_summary']['personality_traits'] = sentences
     
     # Group work experience achievements by job
-    job_groups = defaultdict(lambda: {"achievements": [], "scores": []})
+    job_groups = defaultdict(lambda: {"achievements": [], "scores": [], "metadata": {}})
     for result in work_results:
         metadata = result['metadata']
         job_key = (
@@ -379,22 +390,44 @@ def retrieve_resume_context(
         
         job_groups[job_key]["achievements"].append(result['content'])
         job_groups[job_key]["scores"].append(result['score'])
-        job_groups[job_key]["location"] = metadata.get('location', '')
-        job_groups[job_key]["industry"] = metadata.get('industry', '')
+        job_groups[job_key]["metadata"] = {
+            "location": metadata.get('location', ''),
+            "industry": metadata.get('industry', '')
+        }
     
-    # Filter jobs: Keep only jobs with at least 2 achievements
+    # Rank jobs by average similarity score
+    ranked_jobs = []
     for job_key, job_data in job_groups.items():
-        if len(job_data["achievements"]) >= 2 or not use_filtering:  # Keep all in full retrieval
-            company, position, start_date, end_date = job_key
-            resume_data['work_experience'].append({
-                "position": position,
-                "company": company,
-                "start_date": start_date,
-                "end_date": end_date,
-                "location": job_data["location"],
-                "industry": job_data["industry"],
-                "achievements": job_data["achievements"]
-            })
+        avg_score = sum(job_data["scores"]) / len(job_data["scores"]) if job_data["scores"] else 0
+        ranked_jobs.append({
+            "job_key": job_key,
+            "avg_score": avg_score,
+            "data": job_data
+        })
+    
+    # Sort by average score (descending)
+    ranked_jobs.sort(key=lambda x: x["avg_score"], reverse=True)
+    
+    # Select top N jobs if filtering is enabled
+    if use_filtering:
+        selected_jobs = ranked_jobs[:top_k_jobs]
+    else:
+        selected_jobs = ranked_jobs  # Include all jobs for full retrieval
+    
+    # Build work experience from selected jobs
+    for job_info in selected_jobs:
+        company, position, start_date, end_date = job_info["job_key"]
+        job_data = job_info["data"]
+        
+        resume_data['work_experience'].append({
+            "position": position,
+            "company": company,
+            "start_date": start_date,
+            "end_date": end_date,
+            "location": job_data["metadata"]["location"],
+            "industry": job_data["metadata"]["industry"],
+            "achievements": job_data["achievements"]
+        })
     
     # Sort jobs by start date (most recent first)
     resume_data['work_experience'].sort(
