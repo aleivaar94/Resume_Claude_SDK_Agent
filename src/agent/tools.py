@@ -345,10 +345,20 @@ async def generate_resume_content_tool(args: Dict[str, Any]) -> Dict[str, Any]:
     try:
         print(f"[generate_resume_content_tool] Generating resume for: {args['job_title']}")
         
-        # Parse JSON strings to dicts
-        resume_data = json.loads(args['resume_data_json'])
+        # Parse job_analysis JSON string
         job_analysis = json.loads(args['job_analysis_json'])
         
+        # Retrieve filtered resume data using semantic search on full job info
+        print(f"[generate_resume_content_tool] Retrieving relevant resume data via semantic search...")
+        resume_data = retrieve_resume_context(
+            job_title=args['job_title'],
+            company=args['company'],
+            job_description=args['job_description'],
+            top_k=10
+        )
+        print(f"[generate_resume_content_tool] Retrieved {len(resume_data.get('work_experience', []))} relevant jobs")
+        
+        # Generate resume using filtered data
         prompt = create_resume_prompt(
             resume_data,
             job_analysis,

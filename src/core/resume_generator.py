@@ -194,20 +194,28 @@ def load_resume_yaml(file_path: str) -> Dict[Any, Any]:
     return resume_data
 
 
-def retrieve_resume_context(job_analysis: Dict[str, Any] = None, top_k: int = 10) -> Dict[str, Any]:
+def retrieve_resume_context(
+    job_title: Optional[str] = None, 
+    company: Optional[str] = None, 
+    job_description: Optional[str] = None, 
+    top_k: int = 10
+) -> Dict[str, Any]:
     """
     Retrieve relevant resume context using RAG from vector database.
     
     This function queries the Qdrant vector store to retrieve the most relevant
     resume information based on job requirements. It supports two modes:
-    1. Full retrieval (when job_analysis is None): Returns all resume data
-    2. Filtered retrieval (when job_analysis is provided): Returns only relevant chunks
+    1. Full retrieval (when job info is None): Returns all resume data
+    2. Filtered retrieval (when job info is provided): Returns only relevant chunks
     
     Parameters
     ----------
-    job_analysis : Dict[str, Any], optional
-        Job analysis containing technical_skills, soft_skills, and keywords.
-        If None, retrieves all resume data.
+    job_title : str, optional
+        Job title to search for relevant experience.
+    company : str, optional
+        Company name (context for search).
+    job_description : str, optional
+        Full job description text for semantic search.
     top_k : int, optional
         Maximum number of work achievements to retrieve (default: 10).
     
@@ -229,47 +237,49 @@ def retrieve_resume_context(job_analysis: Dict[str, Any] = None, top_k: int = 10
     - Groups retrieved achievements by job (company, position, dates)
     - Maintains minimum of 2 achievements per job
     - Filters out jobs with only 1 relevant achievement
+    - Uses semantic search on full job information for better matching
     
     Examples
     --------
     >>> # Full retrieval (initial pass)
     >>> resume = retrieve_resume_context()
     >>> 
-    >>> # Filtered retrieval (after job analysis)
-    >>> job_analysis = {
-    ...     'technical_skills': ['Python', 'SQL', 'Power BI'],
-    ...     'soft_skills': ['collaboration', 'problem-solving'],
-    ...     'keywords': ['ETL', 'data pipeline', 'visualization']
-    ... }
-    >>> resume = retrieve_resume_context(job_analysis, top_k=10)
+    >>> # Filtered retrieval using job information
+    >>> resume = retrieve_resume_context(
+    ...     job_title="Data Scientist",
+    ...     company="Acme Corp",
+    ...     job_description="We need Python expertise for ETL pipelines..."
+    ... )
     """
     # Initialize embeddings and vector store
     embedder = OpenAIEmbeddings()
     store = QdrantVectorStore()
     
-    # Construct query for filtered retrieval
-    if job_analysis:
+    # Construct query for filtered retrieval using full job information
+    if job_title or company or job_description:
         query_parts = []
-        if job_analysis.get('technical_skills'):
-            query_parts.extend(job_analysis['technical_skills'])
-        if job_analysis.get('soft_skills'):
-            query_parts.extend(job_analysis['soft_skills'])
-        if job_analysis.get('keywords'):
-            query_parts.extend(job_analysis['keywords'])
+        if job_title:
+            query_parts.append(job_title)
+        if company:
+            query_parts.append(company)
+        if job_description:
+            query_parts.append(job_description)
         
         query_text = ' '.join(query_parts)
         query_vector = embedder.embed_query(query_text)
+        use_filtering = True
     else:
         # For full retrieval, use a generic query
         query_text = "data science analytics machine learning"
         query_vector = embedder.embed_query(query_text)
+        use_filtering = False
     
     # Retrieve different sections with appropriate limits
     
     # Work experience achievements (filtered by relevance)
     work_results = store.search(
         query_vector=query_vector,
-        top_k=top_k if job_analysis else 100,  # Get all if no filter
+        top_k=top_k if use_filtering else 100,  # Get all if no filter
         section_filter="work_experience"
     )
     
@@ -290,7 +300,7 @@ def retrieve_resume_context(job_analysis: Dict[str, Any] = None, top_k: int = 10
     # Continuing studies
     continuing_results = store.search(
         query_vector=query_vector,
-        top_k=10 if job_analysis else 100,
+        top_k=10 if use_filtering else 100,
         section_filter="continuing_studies"
     )
     
@@ -374,7 +384,7 @@ def retrieve_resume_context(job_analysis: Dict[str, Any] = None, top_k: int = 10
     
     # Filter jobs: Keep only jobs with at least 2 achievements
     for job_key, job_data in job_groups.items():
-        if len(job_data["achievements"]) >= 2 or not job_analysis:  # Keep all in full retrieval
+        if len(job_data["achievements"]) >= 2 or not use_filtering:  # Keep all in full retrieval
             company, position, start_date, end_date = job_key
             resume_data['work_experience'].append({
                 "position": position,
@@ -482,6 +492,7 @@ def retrieve_personality_traits(job_analysis: Dict[str, Any], top_k: int = 5) ->
     return '\n\n'.join(personality_texts[:top_k])
 
 def create_resume_prompt(resume_data: Dict[str, Any], job_analysis: Dict[str, Any], job_title: str, company: str, job_description: str) -> str:
+    # Here the resume_data is from the RAG retrieval
     prompt_resume = f"""
     You are an expert resume writer tasked with creating a highly targeted, achievement-based resume that aligns precisely with given job requirements while accurately representing a candidate's experience.
 
