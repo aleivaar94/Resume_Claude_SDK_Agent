@@ -510,7 +510,7 @@ def retrieve_resume_context(
         filename = f"Alejandro_Leiva_{sanitized_title}_{sanitized_company}.json"
     else:
         # For full retrieval, use timestamp
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M")
         filename = f"Alejandro_Leiva_full_resume_{timestamp}.json"
     
     output_path = output_dir / filename
