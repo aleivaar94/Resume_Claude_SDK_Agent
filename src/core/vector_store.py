@@ -78,6 +78,9 @@ class QdrantVectorStore:
         # Create storage directory
         Path(storage_path).mkdir(parents=True, exist_ok=True)
         
+        # Store storage path for client reinitialization
+        self.storage_path = storage_path
+        
         # Initialize Qdrant client with local storage
         self.client = QdrantClient(path=storage_path)
         self.collection_name = "resume_data"
@@ -269,7 +272,7 @@ class QdrantVectorStore:
         Notes
         -----
         This permanently deletes all documents in the collection.
-        Waits to ensure deletion completes before allowing new operations.
+        Reinitializes the client to clear stale cached data.
         """
         # Check if collection exists first
         if not self.client.collection_exists(self.collection_name):
@@ -280,9 +283,17 @@ class QdrantVectorStore:
         self.client.delete_collection(collection_name=self.collection_name)
         print(f"🗑️  Deleted collection '{self.collection_name}'")
         
-        # CRITICAL: Wait for deletion to complete on disk
-        # For persistent storage, this is essential to avoid race conditions
-        time.sleep(10)
+        # CRITICAL: Reinitialize client to clear stale cached data
+        # QdrantClient caches collection metadata - reusing same instance
+        # after delete_collection() returns stale data from the old collection
+        del self.client
+        import gc
+        gc.collect()
+        time.sleep(1.5)  # Wait for disk I/O and garbage collection
+        
+        # Create new client instance with clean cache
+        self.client = QdrantClient(path=self.storage_path)
+        print(f"🔄 Reinitialized client (cleared cache)")
         
         # Recreate empty collection
         self._create_collection_if_not_exists()
@@ -304,7 +315,7 @@ class QdrantVectorStore:
                 if attempt < max_retries - 1:
                     time.sleep(1)
         else:
-            print(f"❌ Failed to fully clear collection after {max_retries} attempts. Manual cleanup may be needed.")
+            print(f"❌ Failed to fully clear collection after {max_retries} attempts. Use reset_database() method instead.")
     
     def count_documents(self) -> int:
         """
@@ -358,8 +369,8 @@ class QdrantVectorStore:
                 self.client.delete_collection(collection_name=self.collection_name)
                 print(f"🗑️  Deleted collection '{self.collection_name}'")
             
-            # Get storage path before closing client
-            storage_path = Path("./vector_db/qdrant_storage")
+            # Get storage path from instance variable
+            storage_path = Path(self.storage_path)
             
             # CRITICAL for Windows: Force close client to release file handles
             # Delete the client object and force garbage collection
