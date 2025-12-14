@@ -131,10 +131,15 @@ class MarkdownParser:
                             location = meta_parts[1].strip() if len(meta_parts) > 1 else ""
                             industry = meta_parts[2].strip() if len(meta_parts) > 2 else ""
                             
-                            # Parse start and end dates
-                            date_parts = dates.split('-')
-                            start_date = date_parts[0].strip() if len(date_parts) > 0 else ""
-                            end_date = date_parts[1].strip() if len(date_parts) > 1 else ""
+                            # Parse start and end dates - split on ' - ' (with spaces) to preserve Month-Year format
+                            if ' - ' in dates:
+                                date_parts = dates.split(' - ')
+                                start_date = date_parts[0].strip()
+                                end_date = date_parts[1].strip() if len(date_parts) > 1 else ""
+                            else:
+                                # Handle single date or "Present"
+                                start_date = dates.strip()
+                                end_date = ""
                             
                             i += 1
                         else:
