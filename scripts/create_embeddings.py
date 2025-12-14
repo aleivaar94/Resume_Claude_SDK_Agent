@@ -443,6 +443,8 @@ def main():
                         help='File type (only markdown supported)')
     parser.add_argument('--reset', action='store_true', 
                         help='Reset and rebuild entire vector database')
+    parser.add_argument('--hard-reset', action='store_true',
+                        help='Completely reset database by deleting storage folder (use if --reset fails)')
     
     args = parser.parse_args()
     
@@ -452,7 +454,10 @@ def main():
     store = QdrantVectorStore()
     
     # Reset database if requested
-    if args.reset:
+    if args.hard_reset:
+        print("🗑️  Performing hard reset (deleting storage folder)...")
+        store.reset_database()
+    elif args.reset:
         print("🗑️  Resetting vector database...")
         store.delete_collection()
     

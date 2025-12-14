@@ -14,6 +14,8 @@ results = store.search(query_vector, top_k=10, section_filter="work_experience")
 """
 
 import os
+import time
+import shutil
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 from qdrant_client import QdrantClient
@@ -159,6 +161,11 @@ class QdrantVectorStore:
                 f"number of embeddings ({len(embeddings)})"
             )
         
+        # Ensure collection exists before adding documents
+        if not self.client.collection_exists(self.collection_name):
+            print(f"ℹ️  Collection doesn't exist. Creating it now...")
+            self._create_collection_if_not_exists()
+        
         # Create points for batch upload
         points = []
         for chunk, embedding in zip(chunks, embeddings):
@@ -262,13 +269,42 @@ class QdrantVectorStore:
         Notes
         -----
         This permanently deletes all documents in the collection.
-        A new collection will be created on next add_documents call.
+        Waits to ensure deletion completes before allowing new operations.
         """
+        # Check if collection exists first
+        if not self.client.collection_exists(self.collection_name):
+            print(f"ℹ️  Collection '{self.collection_name}' does not exist")
+            return
+        
+        # Delete the collection
         self.client.delete_collection(collection_name=self.collection_name)
         print(f"🗑️  Deleted collection '{self.collection_name}'")
         
+        # CRITICAL: Wait for deletion to complete on disk
+        # For persistent storage, this is essential to avoid race conditions
+        time.sleep(10)
+        
         # Recreate empty collection
         self._create_collection_if_not_exists()
+        
+        # Verify deletion completed successfully
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                final_count = self.count_documents()
+                if final_count == 0:
+                    print(f"✅ Verified collection is empty ({final_count} documents)")
+                    break
+                else:
+                    print(f"⚠️  Warning: {final_count} documents still exist after deletion attempt {attempt + 1}/{max_retries}")
+                    if attempt < max_retries - 1:
+                        time.sleep(2)  # Wait longer
+            except Exception as e:
+                print(f"⚠️  Could not verify count (attempt {attempt + 1}): {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(1)
+        else:
+            print(f"❌ Failed to fully clear collection after {max_retries} attempts. Manual cleanup may be needed.")
     
     def count_documents(self) -> int:
         """
@@ -277,7 +313,93 @@ class QdrantVectorStore:
         Returns
         -------
         int
-            Number of documents stored.
+            Number of documents stored. Returns 0 if collection doesn't exist.
         """
-        collection_info = self.client.get_collection(self.collection_name)
-        return collection_info.points_count
+        try:
+            if not self.client.collection_exists(self.collection_name):
+                return 0
+            
+            collection_info = self.client.get_collection(self.collection_name)
+            return collection_info.points_count
+        except Exception as e:
+            print(f"⚠️  Error counting documents: {e}")
+            return 0
+    
+    def reset_database(self) -> None:
+        """
+        Completely reset the vector database by deleting storage folder.
+        
+        This is a more aggressive approach that ensures all data is cleared.
+        Use when delete_collection() has race condition issues.
+        
+        Notes
+        -----
+        This method:
+        1. Deletes the collection (clean shutdown)
+        2. Closes the client to release file handles
+        3. Removes the entire storage folder from disk
+        4. Recreates the storage directory
+        5. Reinitializes the client
+        6. Creates a fresh empty collection
+        
+        Examples
+        --------
+        >>> store = QdrantVectorStore()
+        >>> store.reset_database()
+        🗑️  Deleted collection 'resume_data'
+        🔌 Closed client connection
+        🗑️  Deleted storage folder: ./vector_db/qdrant_storage
+        📁 Recreated storage folder
+        ✅ Database completely reset
+        """
+        try:
+            # Delete collection first (clean shutdown)
+            if self.client.collection_exists(self.collection_name):
+                self.client.delete_collection(collection_name=self.collection_name)
+                print(f"🗑️  Deleted collection '{self.collection_name}'")
+            
+            # Get storage path before closing client
+            storage_path = Path("./vector_db/qdrant_storage")
+            
+            # CRITICAL for Windows: Force close client to release file handles
+            # Delete the client object and force garbage collection
+            del self.client
+            print(f"🔌 Closed client connection")
+            
+            # Force Python garbage collection to release file handles
+            import gc
+            gc.collect()
+            
+            # Wait for OS to fully release file handles (Windows needs more time)
+            time.sleep(2)
+            
+            if storage_path.exists():
+                try:
+                    # Try to delete storage folder
+                    shutil.rmtree(storage_path)
+                    print(f"🗑️  Deleted storage folder: {storage_path}")
+                except PermissionError as e:
+                    # If still locked, wait longer and retry
+                    print(f"⚠️  Storage locked, waiting 3 more seconds...")
+                    time.sleep(3)
+                    gc.collect()
+                    shutil.rmtree(storage_path)
+                    print(f"🗑️  Deleted storage folder: {storage_path}")
+                
+                time.sleep(1)  # Wait for OS cleanup
+                
+                # Recreate storage directory
+                storage_path.mkdir(parents=True, exist_ok=True)
+                print(f"📁 Recreated storage folder")
+            
+            # Reinitialize client with clean storage
+            self.client = QdrantClient(path=str(storage_path))
+            
+            # Create fresh collection
+            self._create_collection_if_not_exists()
+            
+            print(f"✅ Database completely reset")
+            
+        except Exception as e:
+            print(f"❌ Error during database reset: {e}")
+            raise
