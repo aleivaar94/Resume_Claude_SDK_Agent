@@ -162,6 +162,29 @@ python scripts/convert_yaml_to_md.py
 # Generate embeddings and store in vector database
 python scripts/create_embeddings.py --file data/resume_ale.md --type markdown
 python scripts/create_embeddings.py --file data/personalities_16.md --type markdown
+
+# Reset and rebuild entire vector database (use when source data or chunking logic changes)
+python scripts/create_embeddings.py --reset
+```
+
+#### When to Reset the Vector Database
+**Why Reset?** The vector database must be reset when:
+- **Chunking logic changes** (e.g., fixing date parsing, modifying section extraction)
+- **Source data is updated** (e.g., adding new work experience, skills)
+- **Metadata structure changes** (e.g., adding new fields to chunks)
+- **Corrupted or incorrect embeddings** are stored
+
+**What Happens During Reset:**
+1. Deletes the entire `resume_data` collection from Qdrant
+2. Re-parses all markdown files with the latest chunking logic
+3. Generates fresh embeddings for all chunks
+4. Stores corrected data with proper metadata in the vector database
+
+**Example Scenario:** If dates are stored incorrectly (e.g., `"March"` instead of `"March-2025"`), you must reset the database after fixing the parsing code. Simply re-running the script without `--reset` will create duplicate entries with the old corrupted data still present.
+
+```bash
+# After fixing chunking logic or updating source data:
+python scripts/create_embeddings.py --reset
 ```
 
 #### Programmatic Usage
