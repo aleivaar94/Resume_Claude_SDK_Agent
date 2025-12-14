@@ -344,6 +344,7 @@ async def generate_resume_content_tool(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     try:
         print(f"[generate_resume_content_tool] Generating resume for: {args['job_title']}")
+        print(f"[generate_resume_content_tool] Target company: {args['company']}")
         
         # Parse job_analysis JSON string
         job_analysis = json.loads(args['job_analysis_json'])
