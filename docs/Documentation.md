@@ -244,31 +244,85 @@ RAG stands for **Retrieval-Augmented Generation**, which consists of three disti
 ```python
 # Step 1a: Create query embedding (OpenAI)
 query_text = f"{job_title} {company} {job_description}"
-query_vector = embedder.embed_query(query_text)  # OpenAI API call
+query_vector = embedder.embed_query(query_text)
 
-# Step 1b: Search vector store (Qdrant)
+# Step 1b: Retrieve a large pool of achievements from the vector store
+# Parameters controlling retrieval:
+# - top_k_achievement_pool: size of the achievement pool to fetch (e.g. 100)
+# - top_k_achievements_per_job: maximum achievements to keep per job (e.g. 3)
+# - top_k_jobs: how many jobs to return to the prompt (e.g. 4)
+
 work_results = store.search(
     query_vector=query_vector,
-    top_k=10,
+    top_k=top_k_achievement_pool,          # retrieve a broad set of candidate achievements
     section_filter="work_experience"
 )
 
-# Step 1c: Reconstruct filtered resume
-# Groups achievements by job, filters to keep only relevant ones
+# Step 1c: Group by job and reduce to top N achievements per job
+# - Group retrieved achievements by (company, position, start_date, end_date)
+# - For each job: sort its achievements by similarity score and keep only
+#   the top `top_k_achievements_per_job` (jobs with fewer achievements keep all)
+# - Calculate an average relevance score per job using those top achievements
+# - Rank jobs by that average score and select the top `top_k_jobs` for generation
 ```
 
-**Output**: Filtered resume data containing only relevant sections
+**Output**: Filtered resume data containing the selected jobs and their top achievements
 ```json
 {
   "work_experience": [
-    {"company": "CFIA", "position": "Data Scientist", "achievements": [...]}
+    {"company": "CFIA", "position": "Data Scientist", "achievements": ["ach1","ach2","ach3"]}
   ],
   "education": [...],
   "skills": {...}
 }
 ```
 
-**Key Point**: No Claude is used here. This is pure **vector similarity search** using OpenAI embeddings + Qdrant.
+**Key Point**: No Claude is used in retrieval — this is pure **vector similarity search** (OpenAI embeddings + Qdrant) followed by deterministic post-processing that ensures a maximum number of achievements per job before the prompt is assembled.
+
+Additional detail: what gets passed into the resume prompt
+------------------------------------------------------
+
+- For each job selected (the top `top_k_jobs` after ranking), the system keeps only the top N achievements where N is `top_k_achievements_per_job` (default: 3). Jobs with fewer than N retrieved achievements keep all available achievements.
+- The resulting structure — i.e. the selected jobs and their up-to-N achievements — is what is embedded directly into the `Current Resume Data` section of the resume prompt passed to `claude_resume()` / `create_resume_prompt()`.
+
+Example of the exact `resume_data['work_experience']` structure that is serialized into the Claude prompt:
+
+```python
+resume_data = {
+  "work_experience": [
+    {
+      "company": "Canadian Food Inspection Agency",
+      "position": "Data Scientist II",
+      "start_date": "March-2025",
+      "end_date": "November-2025",
+      "achievements": [
+        "Built ETL pipeline to process 1M records/day...",
+        "Designed ML model improving detection accuracy by 12%...",
+        "Optimized data ingestion reducing latency by 40%..."
+      ]  # <= up to top_k_achievements_per_job (default 3)
+    },
+    {
+      "company": "Rubicon Organics",
+      "position": "Data Analyst",
+      "start_date": "March-2023",
+      "end_date": "December-2023",
+      "achievements": [
+        "Automated weekly sales reports...",
+        "Built dashboards to track KPIs...",
+        "Improved ETL reliability by 25%..."
+      ]
+    }
+  ],
+  "education": [...],
+  "skills": {...}
+}
+
+# The prompt assembly then inserts this JSON under the "Current Resume Data" block:
+prompt = create_resume_prompt(resume_data, job_analysis, job_title, company, job_description)
+# Then claude_resume(api_key, prompt) is called to generate the tailored resume
+```
+
+This guarantees the resume prompt receives a concise, focused set of achievements per job (max 3 by default), preventing overly long context while preserving the most relevant evidence for each position.
 
 ---
 
