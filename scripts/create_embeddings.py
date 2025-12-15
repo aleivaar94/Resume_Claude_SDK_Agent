@@ -159,8 +159,11 @@ class MarkdownParser:
                             if line.startswith('- '):
                                 achievement = line[2:].strip()
                                 
+                                # Create embedded content with job position context for better similarity search
+                                embedded_content = f"{position}: {achievement}"
+                                
                                 chunks.append({
-                                    "content": achievement,
+                                    "content": embedded_content,
                                     "source_file": source_file,
                                     "section_type": "work_experience",
                                     "metadata": {
@@ -170,7 +173,8 @@ class MarkdownParser:
                                         "end_date": end_date,
                                         "location": location,
                                         "industry": industry,
-                                        "achievement_index": achievement_index
+                                        "achievement_index": achievement_index,
+                                        "achievement_text": achievement  # Store original for display
                                     }
                                 })
                                 achievement_index += 1

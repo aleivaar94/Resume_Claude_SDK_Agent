@@ -396,7 +396,9 @@ def retrieve_resume_context(
             metadata.get('end_date', '')
         )
         
-        job_groups[job_key]["achievements"].append(result['content'])
+        # Use original achievement text from metadata (backward compatible fallback to content)
+        achievement_text = result['metadata'].get('achievement_text', result['content'])
+        job_groups[job_key]["achievements"].append(achievement_text)
         job_groups[job_key]["scores"].append(result['score'])
         job_groups[job_key]["metadata"] = {
             "location": metadata.get('location', ''),
