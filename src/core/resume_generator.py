@@ -494,35 +494,6 @@ def retrieve_resume_context(
             category_key = category.lower().replace(' ', '_')
             resume_data['skills'][category_key] = skills_list
     
-    # Save retrieved resume context to JSON file
-    output_dir = Path("output/retrieved_resume")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Generate filename based on job_title and company
-    if job_title and company:
-        # Sanitize job_title and company for filename
-        def sanitize_filename(text: str) -> str:
-            # Replace spaces with underscores and remove special characters
-            text = re.sub(r'[^\w\s-]', '', text)
-            text = re.sub(r'[\s-]+', '_', text)
-            return text.strip('_')
-        
-        sanitized_title = sanitize_filename(job_title)
-        sanitized_company = sanitize_filename(company)
-        filename = f"Alejandro_Leiva_{sanitized_title}_{sanitized_company}.json"
-    else:
-        # For full retrieval, use timestamp
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-        filename = f"Alejandro_Leiva_full_resume_{timestamp}.json"
-    
-    output_path = output_dir / filename
-    
-    # Save to JSON
-    with open(output_path, 'w', encoding='utf-8') as f:
-        json.dump(resume_data, f, indent=2, ensure_ascii=False)
-    
-    print(f"💾 Retrieved resume context saved to: {output_path}\n")
-    
     return resume_data
 
 
