@@ -42,7 +42,7 @@ key = os.getenv("CLAUDE_API_KEY")
 if not key:
     raise ValueError("CLAUDE_API_KEY environment variable is required.")
 
-model_name = "claude-3-5-haiku-20241022"
+model_name = "claude-haiku-4-5"
 
 # %%
 # Job Analysis Functions
