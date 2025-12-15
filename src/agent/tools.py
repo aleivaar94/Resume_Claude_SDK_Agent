@@ -298,7 +298,7 @@ async def generate_resume_content_tool(args: Dict[str, Any]) -> Dict[str, Any]:
             job_title=args['job_title'],
             company=args['company'],
             job_description=args['job_description'],
-            top_k_achievements=10,
+            top_k_achievements=20,
             top_k_jobs=4
         )
         print(f"[generate_resume_content_tool] Retrieved {len(resume_data.get('work_experience', []))} relevant jobs")
@@ -505,7 +505,7 @@ async def create_documents_tool(args: Dict[str, Any]) -> Dict[str, Any]:
         
         company = args['company']
         job_title = args['job_title']
-        today = datetime.today().strftime('%Y_%m_%d')
+        today = datetime.today().strftime('%Y_%m_%d_%H_%M')
         
         # Create output directory if it doesn't exist
         output_dir = "output"
