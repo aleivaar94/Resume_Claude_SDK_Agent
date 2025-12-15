@@ -116,62 +116,6 @@ async def scrape_job_tool(args: Dict[str, Any]) -> Dict[str, Any]:
         }
 
 @tool(
-    "get_candidate_profile", 
-    "Retrieve the candidate's resume profile data using RAG from vector database. Contains personal_information, work_experience, education, skills, etc. Returns full resume data initially.", 
-    {}
-)
-async def get_candidate_profile_tool(args: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Loads the candidate's base resume information using RAG retrieval.
-    
-    This tool performs initial full retrieval from the vector database,
-    returning all resume data without filtering.
-    
-    Parameters
-    ----------
-    args : Dict[str, Any]
-        Empty dictionary (no parameters required).
-    
-    Returns
-    -------
-    Dict[str, Any]
-        MCP tool response containing resume data as JSON text.
-        
-    Notes
-    -----
-    Uses RAG to retrieve from Qdrant vector database.
-    Returns all resume data for initial context.
-    
-    Examples
-    --------
-    Output structure:
-    {
-        "content": [{
-            "type": "text",
-            "text": "{\"personal_information\": {...}, \"work_experience\": [...], ...}"
-        }]
-    }
-    """
-    try:
-        print("[get_candidate_profile_tool] Retrieving resume data from vector DB (full retrieval)...")
-        # Full retrieval without job filtering - call with no arguments
-        resume_data = retrieve_resume_context()
-        print(f"[get_candidate_profile_tool] Success - Retrieved {len(resume_data.get('work_experience', []))} jobs")
-        return {
-            "content": [
-                {"type": "text", "text": json.dumps(resume_data, indent=2)}
-            ]
-        }
-    except Exception as e:
-        print(f"[get_candidate_profile_tool] Error: {str(e)}")
-        return {
-            "content": [
-                {"type": "text", "text": f"Error loading resume profile: {str(e)}"}
-            ],
-            "is_error": True
-        }
-
-@tool(
     "get_personality_traits",
     "Retrieve relevant personality traits based on job soft skills to enhance cover letter. Pass job_analysis as JSON string.",
     {"job_analysis_json": str}
@@ -299,9 +243,8 @@ async def analyze_job_tool(args: Dict[str, Any]) -> Dict[str, Any]:
 
 @tool(
     "generate_resume_content", 
-    "Generate tailored resume content. Pass resume_data and job_analysis as JSON strings (use the exact output from previous tools).", 
-    {
-        "resume_data_json": str, 
+    "Generate tailored resume content. Returns both generated resume and original resume data. Pass job_analysis as JSON strings (use the exact output from previous tools).", 
+    { 
         "job_analysis_json": str, 
         "job_title": str, 
         "company": str, 
@@ -356,7 +299,7 @@ async def generate_resume_content_tool(args: Dict[str, Any]) -> Dict[str, Any]:
             company=args['company'],
             job_description=args['job_description'],
             top_k_achievements=10,
-            top_k_jobs=3
+            top_k_jobs=4
         )
         print(f"[generate_resume_content_tool] Retrieved {len(resume_data.get('work_experience', []))} relevant jobs")
         
@@ -370,9 +313,16 @@ async def generate_resume_content_tool(args: Dict[str, Any]) -> Dict[str, Any]:
         )
         result = claude_resume(get_claude_key(), prompt)
         print(f"[generate_resume_content_tool] Success - {len(result.get('work_experience', []))} experiences")
+        
+        # Return both generated content and original resume data
+        combined_output = {
+            "resume_generated": result,        # Tailored content from Claude. Only contains resume summary, work experience, education, continuing studies.
+            "resume_original": resume_data     # Full original resume with personal_information, for header section in document creation.
+        }
+        
         return {
             "content": [
-                {"type": "text", "text": json.dumps(result, indent=2)}
+                {"type": "text", "text": json.dumps(combined_output, indent=2)}
             ]
         }
     except json.JSONDecodeError as e:
@@ -443,7 +393,9 @@ async def generate_cover_letter_content_tool(args: Dict[str, Any]) -> Dict[str, 
         print(f"[generate_cover_letter_content_tool] Generating cover letter for: {args['company']}")
         
         # Parse JSON strings to dicts
-        resume_generated = json.loads(args['resume_generated_json'])
+        resume_data = json.loads(args['resume_generated_json'])
+        # Extract just the generated resume (nested structure from generate_resume_content)
+        resume_generated = resume_data.get('resume_generated', resume_data)  # Fallback for backward compatibility
         job_analysis = json.loads(args['job_analysis_json'])
         personality_traits = args.get('personality_traits', '')
         
@@ -481,10 +433,9 @@ async def generate_cover_letter_content_tool(args: Dict[str, Any]) -> Dict[str, 
 
 @tool(
     "create_documents", 
-    "Create Word and PDF documents. Supports 'both', 'resume_only', or 'cover_letter_only'. Pass all JSON data as strings. Returns absolute file paths.", 
+    "Create Word and PDF documents. Supports 'both', 'resume_only', or 'cover_letter_only'. Pass resume_generated_json from generate_resume_content (contains both generated and original data). Returns absolute file paths.", 
     {
         "resume_generated_json": str, 
-        "resume_original_json": str, 
         "cover_letter_generated_json": str, 
         "company": str, 
         "job_title": str,
@@ -542,8 +493,10 @@ async def create_documents_tool(args: Dict[str, Any]) -> Dict[str, Any]:
         print(f"[create_documents_tool] Creating {document_type} for: {args['job_title']} at {args['company']}")
         
         # Parse JSON strings to dicts
-        resume_generated = json.loads(args['resume_generated_json'])
-        resume_original = json.loads(args['resume_original_json'])
+        # resume_generated_json contains nested structure: {resume_generated: {...}, resume_original: {...}}
+        resume_data = json.loads(args['resume_generated_json'])
+        resume_generated = resume_data['resume_generated']
+        resume_original = resume_data['resume_original']
         
         # Cover letter is optional for resume_only
         cover_letter_generated = None

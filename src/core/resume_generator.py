@@ -200,7 +200,7 @@ def retrieve_resume_context(
     company: Optional[str] = None, 
     job_description: Optional[str] = None, 
     top_k_achievements: int = 10,
-    top_k_jobs: int = 3
+    top_k_jobs: int = 4
 ) -> Dict[str, Any]:
     """
     Retrieve relevant resume context using RAG from vector database.
