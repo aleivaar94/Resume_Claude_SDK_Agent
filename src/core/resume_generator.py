@@ -42,7 +42,7 @@ key = os.getenv("CLAUDE_API_KEY")
 if not key:
     raise ValueError("CLAUDE_API_KEY environment variable is required.")
 
-model_name = "claude-haiku-4-5"
+model_name = "claude-3-5-haiku-20241022"
 
 # %%
 # Job Analysis Functions
@@ -1439,7 +1439,7 @@ def create_resume(job_url: str, brightdata_api_key: str, resume_yaml_path: str =
         
         # Step 6: Create and save documents
         print("Creating and saving documents")
-        today = datetime.today().strftime('%Y_%m_%d')
+        today = datetime.today().strftime('%Y_%m_%d_%H_%M')
         doc = create_resume_coverletter(resume, resume_data, cover_letter, company)
         doc_path = f'Alejandro_Leiva_{job_title}_{company}_{today}.docx'
         doc.save(doc_path)

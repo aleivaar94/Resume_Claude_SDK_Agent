@@ -165,7 +165,7 @@ async def start():
     Requires ANTHROPIC_API_KEY or CLAUDE_API_KEY in environment variables.
     """
     options = ClaudeAgentOptions(
-        model="claude-haiku-4-5",
+        model="claude-3-5-haiku-20241022",
         system_prompt=SYSTEM_PROMPT,
         mcp_servers={"resume_tools": resume_server},
         allowed_tools=[
