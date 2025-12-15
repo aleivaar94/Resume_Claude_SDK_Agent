@@ -199,7 +199,8 @@ def retrieve_resume_context(
     job_title: Optional[str] = None, 
     company: Optional[str] = None, 
     job_description: Optional[str] = None, 
-    top_k_achievements: int = 10,
+    top_k_achievement_pool: int = 100,
+    top_k_achievements_per_job: int = 3,
     top_k_jobs: int = 4
 ) -> Dict[str, Any]:
     """
@@ -211,11 +212,12 @@ def retrieve_resume_context(
     2. Filtered retrieval (when job info is provided): Returns only relevant chunks
     
     Strategy:
-    - Retrieves a pool of relevant achievements (top_k_achievements)
+    - Retrieves a large pool of achievements (top_k_achievement_pool)
     - Groups achievements by job (company + position + dates)
-    - Ranks jobs by average similarity score
+    - For each job, keeps only top N most relevant achievements (top_k_achievements_per_job)
+    - Ranks jobs by average similarity score of their top achievements
     - Selects top N most relevant jobs (top_k_jobs)
-    - Returns ALL achievements for the selected jobs
+    - Returns selected jobs with their top achievements (max 3 per job)
     
     Parameters
     ----------
@@ -225,10 +227,12 @@ def retrieve_resume_context(
         Company name (context for search).
     job_description : str, optional
         Full job description text for semantic search.
-    top_k_achievements : int, optional
-        Number of achievements to retrieve for ranking (default: 10).
+    top_k_achievement_pool : int, optional
+        Size of achievement pool to retrieve from vector store (default: 100).
+    top_k_achievements_per_job : int, optional
+        Maximum achievements to keep per job (default: 3).
     top_k_jobs : int, optional
-        Number of most relevant jobs to include (default: 3).
+        Number of most relevant jobs to include (default: 4).
     
     Returns
     -------
@@ -245,8 +249,9 @@ def retrieve_resume_context(
     
     Notes
     -----
-    - Ranks jobs by average similarity score of their achievements
-    - Returns ALL achievements for top-ranked jobs (no filtering)
+    - Each job limited to max top_k_achievements_per_job achievements
+    - Jobs with fewer achievements include all available
+    - Ranks jobs by average similarity score of their top achievements
     - Uses semantic search on full job information for better matching
     
     Examples
@@ -259,8 +264,9 @@ def retrieve_resume_context(
     ...     job_title="Data Scientist",
     ...     company="Acme Corp",
     ...     job_description="We need Python expertise for ETL pipelines...",
-    ...     top_k_achievements=10,
-    ...     top_k_jobs=3
+    ...     top_k_achievement_pool=100,
+    ...     top_k_achievements_per_job=3,
+    ...     top_k_jobs=4
     ... )
     """
     # Debug: Print parameters received
@@ -298,7 +304,7 @@ def retrieve_resume_context(
     # Work experience achievements (filtered by relevance)
     work_results = store.search(
         query_vector=query_vector,
-        top_k=top_k_achievements if use_filtering else 100,  # Get all if no filter
+        top_k=top_k_achievement_pool if use_filtering else 100,  # Get large pool for filtering
         section_filter="work_experience"
     )
     
@@ -405,7 +411,19 @@ def retrieve_resume_context(
             "industry": metadata.get('industry', '')
         }
     
-    # Rank jobs by average similarity score
+    # For each job, keep only top N achievements by similarity score
+    for job_key, job_data in job_groups.items():
+        # Zip achievements with their scores for sorting
+        achievement_score_pairs = list(zip(job_data["achievements"], job_data["scores"]))
+        # Sort by score (descending)
+        achievement_score_pairs.sort(key=lambda x: x[1], reverse=True)
+        # Keep only top N (max top_k_achievements_per_job)
+        top_pairs = achievement_score_pairs[:top_k_achievements_per_job]
+        # Unzip back into separate lists
+        job_data["achievements"] = [pair[0] for pair in top_pairs]
+        job_data["scores"] = [pair[1] for pair in top_pairs]
+    
+    # Rank jobs by average similarity score (of their top achievements)
     ranked_jobs = []
     for job_key, job_data in job_groups.items():
         avg_score = sum(job_data["scores"]) / len(job_data["scores"]) if job_data["scores"] else 0
@@ -421,7 +439,7 @@ def retrieve_resume_context(
     # Print ranked jobs to terminal
     if ranked_jobs:
         print("\n" + "="*80)
-        print("📊 RANKED JOBS BY RELEVANCE")
+        print("📊 RANKED JOBS BY RELEVANCE (Max 3 Achievements Per Job)")
         print("="*80)
         for idx, job_info in enumerate(ranked_jobs, 1):
             company, position, start_date, end_date = job_info["job_key"]
@@ -430,7 +448,7 @@ def retrieve_resume_context(
             print(f"\n{idx}. {position} at {company}")
             print(f"   Period: {start_date} - {end_date}")
             print(f"   Relevance Score: {avg_score:.4f}")
-            print(f"   Achievements: {num_achievements}")
+            print(f"   Top Achievements: {num_achievements}")
         print("\n" + "="*80 + "\n")
     
     # Select top N jobs if filtering is enabled

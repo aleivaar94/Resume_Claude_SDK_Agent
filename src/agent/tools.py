@@ -298,7 +298,8 @@ async def generate_resume_content_tool(args: Dict[str, Any]) -> Dict[str, Any]:
             job_title=args['job_title'],
             company=args['company'],
             job_description=args['job_description'],
-            top_k_achievements=20,
+            top_k_achievement_pool=100,
+            top_k_achievements_per_job=3,
             top_k_jobs=4
         )
         print(f"[generate_resume_content_tool] Retrieved {len(resume_data.get('work_experience', []))} relevant jobs")
@@ -316,7 +317,7 @@ async def generate_resume_content_tool(args: Dict[str, Any]) -> Dict[str, Any]:
         
         # Return both generated content and original resume data
         combined_output = {
-            "resume_generated": result,        # Tailored content from Claude. Only contains resume summary, work experience, education, continuing studies.
+            "resume_generated": result,        # Tailored content from Claude. Only contains resume professional summary, work experience, education, continuing studies (prompt specified to return only these sections).
             "resume_original": resume_data     # Full original resume with personal_information, for header section in document creation.
         }
         
@@ -505,7 +506,7 @@ async def create_documents_tool(args: Dict[str, Any]) -> Dict[str, Any]:
         
         company = args['company']
         job_title = args['job_title']
-        today = datetime.today().strftime('%Y_%m_%d_%H_%M')
+        today = datetime.today().strftime('%Y%m%d_%H%M')
         
         # Create output directory if it doesn't exist
         output_dir = "output"
