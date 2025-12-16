@@ -398,6 +398,40 @@ personality_traits = retrieve_personality_traits(job_analysis, top_k=5)
 ["analytical problem-solver", "collaborative team player", "innovative thinker"]
 ```
 
+**Personality chunking & embedding details**
+
+- **Source file:** `data/personalities_16.md` — a human-readable markdown document with top-level sections and subsections describing traits, strengths, preferences, and weaknesses.
+- **Chunking strategy (during `scripts/create_embeddings.py`):**
+  - Main sections (## headers) are parsed as separate `personality` chunks (e.g., "Personality Traits", "Career Preferences").
+  - Subsections (### headers or numbered subheaders under a strengths/weaknesses section) are parsed as separate `strength` or `weakness` chunks depending on the parent section.
+  - Each chunk preserves the full subsection text as `content` and receives metadata such as `source_file`, `section`, `subsection` and `section_type`.
+
+- **Example chunk (stored in Qdrant):**
+```
+{
+  "content": "I'm very analytical, highly curious and constantly seek to improve systems...",
+  "source_file": "personalities_16.md",
+  "section": "Personality Traits",
+  "subsection": null,
+  "section_type": "personality",
+  "metadata": {"file": "personalities_16.md", "section_type": "personality"}
+}
+```
+
+- **Embedding process:**
+  - The `OpenAIEmbeddings` wrapper converts each chunk's `content` into a 1536-dimensional vector using `text-embedding-3-small`.
+  - Embeddings and the chunk payload (content + metadata) are inserted into the `resume_data` collection in Qdrant with that `section_type` payload.
+
+- **Retrieval behavior in `retrieve_personality_traits()`**
+  - A query is built from `job_analysis['soft_skills']` and `job_analysis['keywords']`, converted to a query embedding via `embed_query()` and passed to `QdrantVectorStore.search()`.
+  - The function retrieves semantically similar chunks (by vector similarity) and then **filters** results in Python to include only `section_type` values in `['personality', 'strength']` (weakness chunks are intentionally excluded from cover-letter traits).
+  - The top-K filtered chunk `content` values are concatenated and returned to be injected into the cover letter prompt.
+
+- **Why this matters:**
+  - Chunk-level parsing (section/subsection) preserves semantically coherent units (whole trait descriptions and strength explanations) so retrieval returns readable, context-rich personality statements rather than sentence fragments.
+  - Using embeddings + vector search yields semantic matches (e.g., "analytical" trait matches to job requirements mentioning "analytical thinking"), improving relevance in cover letters.
+
+
 #### Phase 2: AUGMENTATION (Combine Context)
 **Function**: [`create_cover_letter_prompt()`](src/core/resume_generator.py )
 
