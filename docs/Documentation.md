@@ -128,9 +128,13 @@ The embedding system converts text documents (resumes, personality profiles, por
   - Local file-based storage (no external database required)
   - Cosine similarity search for semantic matching
   - Metadata filtering (e.g., by section type: work_experience, education)
+  - **Multiple collection support** (separate collections for resume and personality data)
   - Collection management (create, delete, count documents)
   - Batch document insertion with embeddings
 - **Storage Structure**: Each document chunk includes content, source file, section type, and custom metadata
+- **Collections**:
+  - `resume_data`: Work experience, education, skills, continuing studies, personal info (default)
+  - `personality`: Personality traits, strengths, weaknesses from personalities_16.md
 
 #### 3. Data Processing Pipeline (`scripts/create_embeddings.py`)
 - **Purpose**: Orchestrates the complete pipeline from raw markdown to stored embeddings
@@ -154,53 +158,89 @@ personalities_16.md        create_embeddings.py   embeddings.py    vector_store.
 
 ### Usage Examples
 
-#### Processing Resume Data
+#### Processing Resume and Personality Data
+
+The system now uses **two separate collections** for better organization and semantic clarity:
+- **`resume_data`**: Resume content (work experience, education, skills, etc.)
+- **`personality`**: Personality traits (from personalities_16.md)
+
 ```bash
 # Convert YAML to markdown (one-time setup)
 python scripts/convert_yaml_to_md.py
 
-# Generate embeddings and store in vector database
+# Generate embeddings for resume data (stored in "resume_data" collection)
 python scripts/create_embeddings.py --file data/resume_ale.md --type markdown
+
+# Generate embeddings for personality data (stored in "personality" collection)
 python scripts/create_embeddings.py --file data/personalities_16.md --type markdown
 
-# Reset and rebuild entire vector database (use when source data or chunking logic changes)
+# Manual collection targeting (optional - auto-detection works by default)
+python scripts/create_embeddings.py --file data/resume_ale.md --type markdown --collection resume_data
+python scripts/create_embeddings.py --file data/personalities_16.md --type markdown --collection personality
+
+# Check current database state (shows counts for both collections)
+python scripts/create_embeddings.py
+```
+
+#### Resetting and Rebuilding the Vector Database
+
+**Complete Reset (Both Collections)**
+
+When you need to reset BOTH collections (recommended for major changes):
+
+```bash
+# Step 1: Reset the vector database (deletes both collections)
 python scripts/create_embeddings.py --reset
+
+# Step 2: Rebuild resume_data collection
+python scripts/create_embeddings.py --file data/resume_ale.md --type markdown
+
+# Step 3: Rebuild personality collection
+python scripts/create_embeddings.py --file data/personalities_16.md --type markdown
+
+# Step 4: Verify the rebuild
+python scripts/create_embeddings.py
+```
+
+**Expected output after rebuild:**
+```
+📊 Current database state:
+   resume_data: 35 documents
+   personality: 14 documents
 ```
 
 #### When to Reset the Vector Database
+
 **Why Reset?** The vector database must be reset when:
 - **Chunking logic changes** (e.g., fixing date parsing, modifying section extraction)
-- **Source data is updated** (e.g., adding new work experience, skills)
+- **Source data is updated** (e.g., adding new work experience, skills, personality traits)
 - **Metadata structure changes** (e.g., adding new fields to chunks)
 - **Corrupted or incorrect embeddings** are stored
+- **Switching from single to dual-collection architecture** (this update)
 
 **What Happens During Reset:**
-1. Deletes the entire `resume_data` collection from Qdrant
-2. Re-parses all markdown files with the latest chunking logic
-3. Generates fresh embeddings for all chunks
-4. Stores corrected data with proper metadata in the vector database
+1. Deletes BOTH `resume_data` and `personality` collections from Qdrant
+2. Cleans up all stored vectors and metadata
+3. Ready for fresh data processing with the latest chunking logic
 
 **Example Scenario:** If dates are stored incorrectly (e.g., `"March"` instead of `"March-2025"`), you must reset the database after fixing the parsing code. Simply re-running the script without `--reset` will create duplicate entries with the old corrupted data still present.
 
-```bash
-# After fixing chunking logic or updating source data:
-python scripts/create_embeddings.py --reset
-```
-
 #### Programmatic Usage
+
+**Working with Resume Data Collection:**
 ```python
 from src.core.embeddings import OpenAIEmbeddings
 from src.core.vector_store import QdrantVectorStore
 
-# Initialize components
+# Initialize components for resume data (default collection)
 embedder = OpenAIEmbeddings()
-store = QdrantVectorStore()
+resume_store = QdrantVectorStore()  # Uses "resume_data" by default
 
 # Generate query embedding
 query_vector = embedder.embed_query("Python machine learning experience")
 
 # Search for relevant resume sections
-results = store.search(query_vector, top_k=5, section_filter="work_experience")
+results = resume_store.search(query_vector, top_k=5, section_filter="work_experience")
 
 # Results include content, metadata, and similarity scores
 for result in results:
@@ -208,6 +248,40 @@ for result in results:
     print(f"Content: {result['content'][:100]}...")
     print(f"Similarity: {result['score']:.3f}")
 ```
+
+**Working with Personality Collection:**
+```python
+from src.core.embeddings import OpenAIEmbeddings
+from src.core.vector_store import QdrantVectorStore
+
+# Initialize components for personality data
+embedder = OpenAIEmbeddings()
+personality_store = QdrantVectorStore(collection_name="personality")
+
+# Search for personality traits matching job requirements
+query_vector = embedder.embed_query("analytical problem-solving collaborative")
+results = personality_store.search(query_vector, top_k=5)
+
+# Filter out weaknesses (retrieve only personality and strength)
+for result in results:
+    if result['section_type'] in ['personality', 'strength']:
+        print(f"Trait: {result['content'][:100]}...")
+```
+
+### Collection Architecture
+
+The system uses a **dual-collection architecture** for semantic separation:
+
+| Collection | Contents | Use Case | Section Types |
+|------------|----------|----------|---------------|
+| `resume_data` | Resume information from resume_ale.md | Job-specific resume tailoring | work_experience, education, skills, continuing_studies, personal_info, professional_summary |
+| `personality` | Personality traits from personalities_16.md | Cover letter personalization | personality, strength, weakness |
+
+**Benefits:**
+- **Semantic separation**: Resume facts vs personality traits stored separately
+- **Cleaner queries**: No need to filter by section_type when searching personality
+- **Performance**: Smaller collections = faster semantic search
+- **Flexibility**: Can tune retrieval parameters independently per collection
 
 ### Environment Variables
 - **`OPENAI_API_KEY`**: Required for generating embeddings via OpenAI API
@@ -389,25 +463,35 @@ response = client.messages.create(
 
 **What happens:**
 ```python
-# Search vector store for personality traits matching job soft skills
+# Initialize personality collection store
+store = QdrantVectorStore(collection_name="personality")
+
+# Search personality collection for traits matching job soft skills
 personality_traits = retrieve_personality_traits(job_analysis, top_k=5)
 ```
 
-**Output**: Relevant personality traits from vector store
+**Output**: Relevant personality traits from personality collection
 ```json
 ["analytical problem-solver", "collaborative team player", "innovative thinker"]
 ```
 
+**Collection-Based Retrieval:**
+- Uses the **`personality` collection** (separate from resume_data)
+- No section_type filtering needed during search (all chunks in this collection are personality-related)
+- Still filters OUT `weakness` chunks to avoid negative traits in cover letters
+- More efficient search due to smaller, focused collection
+
 **Personality chunking & embedding details**
 
 - **Source file:** `data/personalities_16.md` — a human-readable markdown document with top-level sections and subsections describing traits, strengths, preferences, and weaknesses.
+- **Target collection:** `personality` (stored separately from resume data)
 - **Chunking strategy (during `scripts/create_embeddings.py`):**
   - Main sections (## headers) are parsed as separate `personality` chunks (e.g., "Personality Traits", "Career Preferences").
   - Subsections (### headers or numbered subheaders under a strengths/weaknesses section) are parsed as separate `strength` or `weakness` chunks depending on the parent section.
   - Each chunk preserves the full subsection text as `content` and receives metadata such as `source_file`, `section`, `subsection` and `section_type`.
 
-- **Example chunk (stored in Qdrant):**
-```
+- **Example chunk (stored in personality collection):**
+```json
 {
   "content": "I'm very analytical, highly curious and constantly seek to improve systems...",
   "source_file": "personalities_16.md",
@@ -420,16 +504,21 @@ personality_traits = retrieve_personality_traits(job_analysis, top_k=5)
 
 - **Embedding process:**
   - The `OpenAIEmbeddings` wrapper converts each chunk's `content` into a 1536-dimensional vector using `text-embedding-3-small`.
-  - Embeddings and the chunk payload (content + metadata) are inserted into the `resume_data` collection in Qdrant with that `section_type` payload.
+  - Embeddings and the chunk payload (content + metadata) are inserted into the **`personality` collection** in Qdrant (separate from resume_data).
 
 - **Retrieval behavior in `retrieve_personality_traits()`**
-  - A query is built from `job_analysis['soft_skills']` and `job_analysis['keywords']`, converted to a query embedding via `embed_query()` and passed to `QdrantVectorStore.search()`.
-  - The function retrieves semantically similar chunks (by vector similarity) and then **filters** results in Python to include only `section_type` values in `['personality', 'strength']` (weakness chunks are intentionally excluded from cover-letter traits).
-  - The top-K filtered chunk `content` values are concatenated and returned to be injected into the cover letter prompt.
+  - Creates a `QdrantVectorStore(collection_name="personality")` instance to search only personality data
+  - A query is built from `job_analysis['soft_skills']` and `job_analysis['keywords']`, converted to a query embedding via `embed_query()` and passed to `QdrantVectorStore.search()`
+  - Since all chunks in the personality collection are personality-related, no section_type filtering is needed during search
+  - The function still **filters OUT** `section_type='weakness'` chunks in Python to exclude negative traits from cover letters
+  - The top-K filtered chunk `content` values (personality and strength only) are concatenated and returned for the cover letter prompt
 
-- **Why this matters:**
-  - Chunk-level parsing (section/subsection) preserves semantically coherent units (whole trait descriptions and strength explanations) so retrieval returns readable, context-rich personality statements rather than sentence fragments.
-  - Using embeddings + vector search yields semantic matches (e.g., "analytical" trait matches to job requirements mentioning "analytical thinking"), improving relevance in cover letters.
+- **Why the separate collection matters:**
+  - **Semantic separation**: Resume facts and personality traits stored independently
+  - **No cross-contamination**: Searching personality collection won't return work achievements
+  - **Faster queries**: Smaller collection (14 chunks vs 49) = faster semantic search
+  - **Cleaner architecture**: Clear separation of concerns between factual resume data and personality profiling
+  - Using embeddings + vector search yields semantic matches (e.g., "analytical" trait matches to job requirements mentioning "analytical thinking"), improving relevance in cover letters
 
 
 #### Phase 2: AUGMENTATION (Combine Context)
