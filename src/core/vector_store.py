@@ -61,7 +61,7 @@ class QdrantVectorStore:
     >>> store.add_documents(chunks, embeddings)
     """
     
-    def __init__(self, storage_path: str = "./vector_db/qdrant_storage"):
+    def __init__(self, storage_path: str = "./vector_db/qdrant_storage", collection_name: str = "resume_data"):
         """
         Initialize Qdrant vector store with local persistent storage.
         
@@ -69,6 +69,9 @@ class QdrantVectorStore:
         ----------
         storage_path : str, optional
             Path to local Qdrant storage directory (default: ./vector_db/qdrant_storage).
+        collection_name : str, optional
+            Name of the collection to use (default: "resume_data").
+            Use "personality" for personality traits collection.
         
         Notes
         -----
@@ -83,7 +86,7 @@ class QdrantVectorStore:
         
         # Initialize Qdrant client with local storage
         self.client = QdrantClient(path=storage_path)
-        self.collection_name = "resume_data"
+        self.collection_name = collection_name
         self.vector_size = 1536  # text-embedding-3-small dimension
         
         # Create collection if it doesn't exist

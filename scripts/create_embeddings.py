@@ -438,31 +438,56 @@ def main():
     Examples
     --------
     $ python scripts/create_embeddings.py --file data/resume_ale.md --type markdown
-    $ python scripts/create_embeddings.py --file data/personalities_16.md --type markdown
+    $ python scripts/create_embeddings.py --file data/personalities_16.md --type markdown --collection personality
     $ python scripts/create_embeddings.py --reset
     """
     parser = argparse.ArgumentParser(description="Create embeddings from markdown files")
     parser.add_argument('--file', type=str, help='Path to markdown file')
     parser.add_argument('--type', type=str, default='markdown', choices=['markdown'], 
                         help='File type (only markdown supported)')
+    parser.add_argument('--collection', type=str, 
+                        help='Target collection name (auto-detected if not specified: resume files -> "resume_data", personality files -> "personality")')
     parser.add_argument('--reset', action='store_true', 
                         help='Reset and rebuild entire vector database (deletes storage folder)')
     
     args = parser.parse_args()
     
-    # Initialize embeddings and vector store
-    print("🔧 Initializing OpenAI embeddings and Qdrant vector store...")
+    # Initialize embeddings
+    print("🔧 Initializing OpenAI embeddings...")
     embedder = OpenAIEmbeddings()
-    store = QdrantVectorStore()
     
     # Reset database if requested
     if args.reset:
-        print("🗑️  Resetting vector database (deleting storage folder)...")
+        print("🗑️  Resetting vector database (deleting both collections)...")
+        # Create a single store instance to reset the entire database
+        # This avoids file locking issues with multiple client instances
+        store = QdrantVectorStore(collection_name="resume_data")
         store.reset_database()
+        print(f"   ✅ Reset complete - all collections deleted and storage cleared")
     
     # Process file if provided
     if args.file:
         print(f"\n📄 Processing file: {args.file}")
+        
+        # Auto-detect collection if not specified
+        if args.collection:
+            collection_name = args.collection
+            print(f"📦 Using specified collection: {collection_name}")
+        else:
+            # Auto-detect based on filename
+            source_file = Path(args.file).name.lower()
+            if 'personalit' in source_file:
+                collection_name = "personality"
+                print(f"📦 Auto-detected collection: personality (from filename)")
+            elif 'resume' in source_file:
+                collection_name = "resume_data"
+                print(f"📦 Auto-detected collection: resume_data (from filename)")
+            else:
+                print(f"⚠️  Warning: Could not auto-detect collection from filename. Using 'resume_data'")
+                collection_name = "resume_data"
+        
+        # Initialize vector store with target collection
+        store = QdrantVectorStore(collection_name=collection_name)
         
         # Extract chunks
         chunks, char_count = process_file(args.file, args.type)
@@ -475,17 +500,24 @@ def main():
         print(f"✅ Generated {len(embeddings)} embeddings")
         
         # Store in Qdrant
-        print("💾 Storing in vector database...")
+        print(f"💾 Storing in vector database (collection: {collection_name})...")
         store.add_documents(chunks, embeddings)
         
         # Print summary
         print(f"\n📊 Summary:")
-        print(f"   Total documents in DB: {store.count_documents()}")
+        print(f"   Collection: {collection_name}")
+        print(f"   Total documents in collection: {store.count_documents()}")
         print(f"   Section types: {set(c['section_type'] for c in chunks)}")
     else:
-        # Show current state
+        # Show current state for all collections
         print(f"\n📊 Current database state:")
-        print(f"   Total documents: {store.count_documents()}")
+        for collection in ["resume_data", "personality"]:
+            try:
+                store = QdrantVectorStore(collection_name=collection)
+                count = store.count_documents()
+                print(f"   {collection}: {count} documents")
+            except Exception as e:
+                print(f"   {collection}: Collection not found or empty")
     
     print("\n✨ Done!")
 

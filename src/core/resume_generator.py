@@ -519,6 +519,9 @@ def retrieve_personality_traits(job_analysis: Dict[str, Any], top_k: int = 5) ->
     """
     Retrieve relevant personality traits for cover letter enhancement.
     
+    Uses the "personality" collection in Qdrant to find traits matching
+    job requirements based on soft skills and keywords.
+    
     Parameters
     ----------
     job_analysis : Dict[str, Any]
@@ -539,10 +542,16 @@ def retrieve_personality_traits(job_analysis: Dict[str, Any], top_k: int = 5) ->
     ... }
     >>> traits = retrieve_personality_traits(job_analysis, top_k=5)
     >>> print(traits)
+    
+    Notes
+    -----
+    This function uses the "personality" collection which contains only
+    personality-related chunks from personalities_16.md. Weakness chunks
+    are still filtered out to avoid including negative traits in cover letters.
     """
-    # Initialize embeddings and vector store
+    # Initialize embeddings and vector store (use personality collection)
     embedder = OpenAIEmbeddings()
-    store = QdrantVectorStore()
+    store = QdrantVectorStore(collection_name="personality")
     
     # Construct query from soft skills
     query_parts = []
@@ -554,18 +563,20 @@ def retrieve_personality_traits(job_analysis: Dict[str, Any], top_k: int = 5) ->
     query_text = ' '.join(query_parts) if query_parts else "personality traits"
     query_vector = embedder.embed_query(query_text)
     
-    # Retrieve personality and strength traits
+    # Retrieve from personality collection
     results = store.search(
         query_vector=query_vector,
-        top_k=top_k,
-        section_filter=None  # Will manually filter
+        top_k=top_k, # Will manually filter
+        section_filter=None
     )
     
-    # Filter for personality/strength sections
+    # Filter OUT weakness sections (keep personality and strength only)
     personality_texts = []
     for result in results:
         if result['section_type'] in ['personality', 'strength']:
             personality_texts.append(result['content'])
+            if len(personality_texts) >= top_k:
+                break
     
     return '\n\n'.join(personality_texts[:top_k])
 
