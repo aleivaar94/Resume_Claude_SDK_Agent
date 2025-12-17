@@ -31,3 +31,12 @@ rag_resume
 
 hiring_manager
 - at some point departed from main. Uses hiring manager parameter that is detected in query and passed into prompt so that it's included in cover letter. Left so that I have a reference for future implementation into RAG version.
+
+
+What have I learned?
+
+- Chunking strategy depends on the document structrue (resume_ale.md vs personalities_16.md)
+- Collections in vector DB can be used to separate different document types for more targeted retrieval or to organize data better.
+    - Guiding principle: create separate collections when the data represents fundamentally different semantic spaces, serves different search purposes, has different lifecycle requirements, or needs isolation for security or performance reasons. Think about how your users will search, what they expect to find, and whether mixing the data would produce meaningful or confusing results.
+- Metadata vs top-level payload:
+    - Promote frequently-filtered values (company, dates, role) to top-level payload fields when you upsert (duplicate is fine). That gives the best server-side filtering and performance. Keep richer context under metadata for display and downstream logic.
