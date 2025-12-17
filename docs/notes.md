@@ -40,3 +40,8 @@ What have I learned?
     - Guiding principle: create separate collections when the data represents fundamentally different semantic spaces, serves different search purposes, has different lifecycle requirements, or needs isolation for security or performance reasons. Think about how your users will search, what they expect to find, and whether mixing the data would produce meaningful or confusing results.
 - Metadata vs top-level payload:
     - Promote frequently-filtered values (company, dates, role) to top-level payload fields when you upsert (duplicate is fine). That gives the best server-side filtering and performance. Keep richer context under metadata for display and downstream logic.
+
+In Qdrant you can also filter by metadata fields:
+Nested objects
+If payload has: {"metadata": {"company": "CFIA"}}
+FieldCondition(key="metadata.company", match=MatchValue(value="CFIA"))
