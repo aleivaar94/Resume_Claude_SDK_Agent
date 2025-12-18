@@ -300,102 +300,88 @@ class MarkdownParser:
         return chunks
     
     @staticmethod
-    def parse_personality_markdown(content: str, source_file: str) -> List[Dict[str, Any]]:
+    def parse_personality_fixed_chunks(
+        content: str, 
+        source_file: str,
+        chunk_size: int = 400,
+        overlap: int = 100
+    ) -> List[Dict[str, Any]]:
         """
-        Parse personality markdown file into chunks.
+        Parse personality markdown with fixed-size chunking and sliding window.
+        
+        Applies simple fixed-size chunking across entire document without section
+        awareness. Uses sliding window with overlap to maintain context.
         
         Parameters
         ----------
         content : str
-            Full markdown content.
+            Full markdown content from personalities_16.md.
         source_file : str
-            Name of the source file.
+            Filename for tracking ("personalities_16.md").
+        chunk_size : int, default=400
+            Target characters per chunk.
+        overlap : int, default=100
+            Overlapping characters between consecutive chunks (25% overlap).
         
         Returns
         -------
         List[Dict[str, Any]]
-            List of document chunks with metadata.
+            List of chunk dictionaries with payload structure:
+            {
+                "content": str,
+                "source_file": str,
+                "section_type": "",  # Empty for personality chunks
+                "metadata": {
+                    "chunk_index": int,
+                    "char_start": int,
+                    "char_end": int,
+                    "overlap_chars": int
+                }
+            }
         
         Notes
         -----
         Chunking strategy:
-        - Main sections (## headers): 1 chunk each
-        - Subsections (### headers): 1 chunk each (strengths/weaknesses)
+        - Apply 400-char chunks with 100-char overlap across entire content
+        - No section identification or header parsing
+        - Simple sliding window approach
+        
+        Examples
+        --------
+        >>> content = Path("data/personalities_16.md").read_text()
+        >>> chunks = MarkdownParser.parse_personality_fixed_chunks(content, "personalities_16.md")
+        >>> len(chunks)
+        10
+        >>> chunks[0]["section_type"]
+        ''
         """
         chunks = []
-        lines = content.split('\n')
-        i = 0
+        chunk_index = 0
+        start = 0
         
-        current_section = ""
-        
-        while i < len(lines):
-            line = lines[i].strip()
+        # Apply fixed-size chunking across entire content
+        while start < len(content):
+            end = min(start + chunk_size, len(content))
+            chunk_text = content[start:end]
             
-            # Main section (## header)
-            if line.startswith('## '):
-                current_section = line[3:].strip()
-                section_content = []
-                i += 1
-                
-                # Collect content until next ## or ### header
-                while i < len(lines):
-                    next_line = lines[i].strip()
-                    
-                    # Stop at next main section
-                    if next_line.startswith('## '):
-                        break
-                    
-                    # Handle subsections (### headers)
-                    if next_line.startswith('### '):
-                        break
-                    
-                    if next_line:
-                        section_content.append(next_line)
-                    i += 1
-                
-                # Add main section if it has content
-                if section_content:
-                    chunks.append({
-                        "content": ' '.join(section_content),
-                        "source_file": source_file,
-                        "section_type": "personality",
-                        "metadata": {"section": current_section}
-                    })
-                continue
+            # Calculate overlap for next chunk
+            overlap_chars = overlap if end < len(content) else 0
             
-            # Subsection (### header) - typically strengths/weaknesses
-            if line.startswith('### '):
-                subsection = line[4:].strip()
-                subsection_content = []
-                i += 1
-                
-                # Collect content until next ### or ## header
-                while i < len(lines):
-                    next_line = lines[i].strip()
-                    
-                    if next_line.startswith('###') or next_line.startswith('## '):
-                        break
-                    
-                    if next_line:
-                        subsection_content.append(next_line)
-                    i += 1
-                
-                # Determine section type (strength or weakness)
-                section_type = "strength" if "Strengths" in current_section else "weakness"
-                
-                if subsection_content:
-                    chunks.append({
-                        "content": f"{subsection}: {' '.join(subsection_content)}",
-                        "source_file": source_file,
-                        "section_type": section_type,
-                        "metadata": {
-                            "trait_name": subsection,
-                            "category": current_section
-                        }
-                    })
-                continue
+            chunks.append({
+                "content": chunk_text.strip(),
+                "source_file": source_file,
+                "section_type": "",  # No section_type for personality chunks
+                "metadata": {
+                    "chunk_index": chunk_index,
+                    "char_start": start,
+                    "char_end": end,
+                    "overlap_chars": overlap_chars
+                }
+            })
             
-            i += 1
+            # Move forward with overlap (step size = chunk_size - overlap)
+            start += (chunk_size - overlap)
+            chunk_index += 1
         
         return chunks
 
@@ -403,6 +389,10 @@ class MarkdownParser:
 def process_file(file_path: str, file_type: str) -> Tuple[List[Dict[str, Any]], int]:
     """
     Process a file and extract chunks.
+    
+    Uses auto-detection to determine chunking method:
+    - personalities_16.md: Fixed-size chunking (400 chars, 100 overlap)
+    - resume files: Header-based chunking
     
     Parameters
     ----------
@@ -421,12 +411,14 @@ def process_file(file_path: str, file_type: str) -> Tuple[List[Dict[str, Any]], 
     
     source_file = Path(file_path).name
     
-    if 'resume' in source_file.lower():
+    # Auto-detect chunking method based on filename
+    if source_file == "personalities_16.md":
+        print(f"   ✂️  Using fixed-size chunking (400 chars, 100 overlap) for personalities_16.md")
+        chunks = MarkdownParser.parse_personality_fixed_chunks(content, source_file)
+    elif 'resume' in source_file.lower():
         chunks = MarkdownParser.parse_resume_markdown(content, source_file)
-    elif 'personalit' in source_file.lower():
-        chunks = MarkdownParser.parse_personality_markdown(content, source_file)
     else:
-        raise ValueError(f"Unknown file type: {source_file}")
+        raise ValueError(f"Unknown file type: {source_file}. Expected 'personalities_16.md' or resume file.")
     
     return chunks, len(content)
 

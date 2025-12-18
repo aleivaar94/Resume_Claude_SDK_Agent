@@ -152,8 +152,20 @@ async def get_personality_traits_tool(args: Dict[str, Any]) -> Dict[str, Any]:
     try:
         print("[get_personality_traits_tool] Retrieving relevant personality traits...")
         job_analysis = json.loads(args["job_analysis_json"])
-        personality_text = retrieve_personality_traits(job_analysis, top_k=5)
-        print(f"[get_personality_traits_tool] Success - Retrieved {len(personality_text.split('\\n\\n'))} traits")
+        
+        # Retrieve more traits for richer cover letter content
+        personality_text = retrieve_personality_traits(job_analysis, top_k=12)
+        
+        # Print retrieved traits for visibility
+        print(f"\n{'='*80}")
+        print("📝 PERSONALITY TRAITS RETRIEVED FOR COVER LETTER")
+        print(f"{'='*80}")
+        print(personality_text)
+        print(f"{'='*80}\n")
+        
+        trait_sections = [s.strip() for s in personality_text.split('##') if s.strip()]
+        print(f"[get_personality_traits_tool] Success - Retrieved {len(trait_sections)} section(s)")
+        
         return {
             "content": [
                 {"type": "text", "text": personality_text}

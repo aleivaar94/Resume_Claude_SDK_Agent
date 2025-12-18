@@ -515,24 +515,26 @@ def retrieve_resume_context(
     return resume_data
 
 
-def retrieve_personality_traits(job_analysis: Dict[str, Any], top_k: int = 5) -> str:
+def retrieve_personality_traits(job_analysis: Dict[str, Any], top_k: int = 12) -> str:
     """
     Retrieve relevant personality traits for cover letter enhancement.
     
-    Uses the "personality" collection in Qdrant to find traits matching
-    job requirements based on soft skills and keywords.
+    Uses the "personality" collection in Qdrant with pure semantic search
+    (no filtering). Handles overlapping chunks from fixed-size chunking by
+    deduplicating content based on character ranges.
     
     Parameters
     ----------
     job_analysis : Dict[str, Any]
         Job analysis containing soft_skills and keywords.
     top_k : int, optional
-        Number of personality traits to retrieve (default: 5).
+        Number of personality chunks to retrieve (default: 12, increased to get
+        more comprehensive trait coverage for cover letters).
     
     Returns
     -------
     str
-        Concatenated personality traits text.
+        Deduplicated personality traits text.
     
     Examples
     --------
@@ -540,20 +542,72 @@ def retrieve_personality_traits(job_analysis: Dict[str, Any], top_k: int = 5) ->
     ...     'soft_skills': ['collaboration', 'problem-solving', 'communication'],
     ...     'keywords': ['team player', 'analytical']
     ... }
-    >>> traits = retrieve_personality_traits(job_analysis, top_k=5)
+    >>> traits = retrieve_personality_traits(job_analysis, top_k=8)
     >>> print(traits)
     
     Notes
     -----
-    This function uses the "personality" collection which contains only
-    personality-related chunks from personalities_16.md. Weakness chunks
-    are still filtered out to avoid including negative traits in cover letters.
+    This function uses the "personality" collection with simple fixed-size
+    chunking (no section awareness). Semantic search handles relevance ranking.
+    Overlapping chunks (100-char overlap from 400-char chunks) are merged to
+    avoid duplicate text.
     """
+    
+    def _merge_overlapping_chunks(results: List[Dict[str, Any]]) -> str:
+        """
+        Merge overlapping chunks to deduplicate content.
+        
+        Parameters
+        ----------
+        results : List[Dict[str, Any]]
+            Search results with metadata containing char_start, char_end, chunk_index.
+        
+        Returns
+        -------
+        str
+            Deduplicated text without section headers.
+        
+        Notes
+        -----
+        Sorts chunks by chunk_index to maintain document order,
+        then removes overlapping portions based on character ranges.
+        """
+        if not results:
+            return ""
+        
+        # Sort by chunk_index to maintain document order
+        sorted_results = sorted(
+            results,
+            key=lambda x: x.get('metadata', {}).get('chunk_index', 0)
+        )
+        
+        merged_text = []
+        prev_char_end = -1
+        
+        for result in sorted_results:
+            char_start = result.get('metadata', {}).get('char_start', 0)
+            char_end = result.get('metadata', {}).get('char_end', 0)
+            content = result.get('content', '')
+            
+            # Handle overlapping content
+            if char_start < prev_char_end:
+                # Calculate overlap size and skip overlapping portion
+                overlap_size = prev_char_end - char_start
+                if overlap_size < len(content):
+                    merged_text.append(content[overlap_size:])
+                    prev_char_end = char_end
+            else:
+                # No overlap, add full content
+                merged_text.append(content)
+                prev_char_end = char_end
+        
+        return '\n'.join(merged_text)
+    
     # Initialize embeddings and vector store (use personality collection)
     embedder = OpenAIEmbeddings()
     store = QdrantVectorStore(collection_name="personality")
     
-    # Construct query from soft skills
+    # Construct query from soft skills and keywords
     query_parts = []
     if job_analysis.get('soft_skills'):
         query_parts.extend(job_analysis['soft_skills'])
@@ -561,24 +615,31 @@ def retrieve_personality_traits(job_analysis: Dict[str, Any], top_k: int = 5) ->
         query_parts.extend(job_analysis['keywords'])
     
     query_text = ' '.join(query_parts) if query_parts else "personality traits"
+    print(f"\n🔍 Personality Query: '{query_text}'")
+    
     query_vector = embedder.embed_query(query_text)
     
-    # Retrieve from personality collection
+    # Retrieve from personality collection without filtering
+    # Semantic search handles relevance ranking
     results = store.search(
         query_vector=query_vector,
-        top_k=top_k, # Will manually filter
-        section_filter=None
+        top_k=top_k,
+        section_filter=None  # No filtering - pure semantic search
     )
     
-    # Filter OUT weakness sections (keep personality and strength only)
-    personality_texts = []
-    for result in results:
-        if result['section_type'] in ['personality', 'strength']:
-            personality_texts.append(result['content'])
-            if len(personality_texts) >= top_k:
-                break
+    print(f"📊 Retrieved {len(results)} chunk(s) from personality collection")
     
-    return '\n\n'.join(personality_texts[:top_k])
+    # Show what was retrieved before deduplication
+    for i, result in enumerate(results[:5], 1):  # Show first 5
+        score = result.get('score', 0)
+        preview = result.get('content', '')[:80].replace('\n', ' ')
+        print(f"   {i}. Score: {score:.3f} - {preview}...")
+    
+    # Merge overlapping chunks and return deduplicated text
+    merged = _merge_overlapping_chunks(results)
+    print(f"✅ Merged and deduplicated {len(results)} chunk(s)\n")
+    
+    return merged
 
 def create_resume_prompt(resume_data: Dict[str, Any], job_analysis: Dict[str, Any], job_title: str, company: str, job_description: str) -> str:
     # Here the resume_data is from the RAG retrieval

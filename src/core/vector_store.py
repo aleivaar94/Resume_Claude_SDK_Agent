@@ -181,7 +181,7 @@ class QdrantVectorStore:
                 payload={
                     "content": chunk["content"],
                     "source_file": chunk["source_file"],
-                    "section_type": chunk["section_type"],
+                    "section_type": chunk.get("section_type", ""),
                     "metadata": chunk.get("metadata", {})
                 }
             )
