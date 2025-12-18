@@ -17,51 +17,93 @@ if not brightdata_api_key:
 
 # %%
 def get_brightdata_snapshot_linkedin(job_url, api_key):
-	api_url = "https://api.brightdata.com/datasets/v3/trigger"
-	headers = {
-		"Authorization": f"Bearer {api_key}",
-		"Content-Type": "application/json",
-	}
-	params = {
-		"dataset_id": "gd_lpfll7v5hcqtkxl6l",
-		"include_errors": "true",
-	}
-	data = {
-		"input": [{"url": job_url}],
-		"custom_output_fields": [
-			    "url",
-				"job_posting_id",
-				"job_title",
-				"company_name",
-				"company_id",
-				"job_location",
-				"job_summary",
-				# "job_seniority_level",
-				# "job_function",
-				# "job_employment_type",
-				# "job_industries",
-				"company_url",
-				# "job_posted_time",
-				# "job_num_applicants",
-				# "discovery_input",
-				# "apply_link",
-				# "country_code",
-				# "title_id",
-				# "company_logo",
-				"job_posted_date",
-				"job_poster",
-				# "application_availability",
-				# "job_description_formatted",
-				# "base_salary",
-				# "salary_standards",
-				# "timestamp",
-				# "input"
-		],
-	}
+    """
+    Triggers a BrightData snapshot for a LinkedIn job posting.
+    
+    Parameters
+    ----------
+    job_url : str
+        LinkedIn job posting URL to scrape.
+    api_key : str
+        BrightData API authentication key.
+    
+    Returns
+    -------
+    str
+        Snapshot ID for tracking the scraping job.
+    """
+    api_url = "https://api.brightdata.com/datasets/v3/trigger"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    params = {
+        "dataset_id": "gd_lpfll7v5hcqtkxl6l",
+        "include_errors": "true",
+    }
+    data = {
+        "input": [{"url": job_url}],
+        "custom_output_fields": [
+            "url",
+            "job_posting_id",
+            "job_title",
+            "company_name",
+            "company_id",
+            "job_location",
+            "job_summary",
+            "company_url",
+            "job_posted_date",
+            "job_poster",
+        ],
+    }
 
-	response = requests.post(api_url, headers=headers, params=params, json=data)
-	response_json = response.json()
-	return response_json['snapshot_id']
+    response = requests.post(api_url, headers=headers, params=params, json=data)
+    response_json = response.json()
+    print(f"LinkedIn Snapshot ID: {response_json['snapshot_id']}")
+    return response_json['snapshot_id']
+
+
+def get_brightdata_snapshot_indeed(job_url, api_key):
+    """
+    Triggers a BrightData snapshot for an Indeed job posting.
+    
+    Parameters
+    ----------
+    job_url : str
+        Indeed job posting URL to scrape.
+    api_key : str
+        BrightData API authentication key.
+    
+    Returns
+    -------
+    str
+        Snapshot ID for tracking the scraping job.
+    """
+    api_url = "https://api.brightdata.com/datasets/v3/trigger"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    params = {
+        "dataset_id": "gd_l4dx9j9sscpvs7no2",
+        "include_errors": "true",
+    }
+    data = {
+        "input": [{"url": job_url}],
+        "custom_output_fields": [
+            "jobid",
+            "company_name", 
+            "date_posted_parsed",
+            "job_title",
+            "description_text",
+            "company_link",
+        ]
+    }
+
+    response = requests.post(api_url, headers=headers, params=params, json=data)
+    response_json = response.json()
+    print(f"Indeed Snapshot ID: {response_json['snapshot_id']}")
+    return response_json['snapshot_id']
 
 # %%
 def get_snapshot_output(snapshot_id: str, api_key: str, max_retries: int = 40, wait_time: int = 5) -> dict:
@@ -171,51 +213,6 @@ def extract_job_info_linkedin(json_output):
     return result, result_df
 
 # %%
-def get_brightdata_snapshot_indeed(job_url, api_key):
-	api_url = "https://api.brightdata.com/datasets/v3/trigger"
-	headers = {
-		"Authorization": f"Bearer {api_key}",
-		"Content-Type": "application/json",
-	}
-	params = {
-		"dataset_id": "gd_l4dx9j9sscpvs7no2",
-		"include_errors": "true",
-	}
-	data = {
-		"input": [{"url": job_url}],
-		"custom_output_fields": [
-			"jobid",
-			"company_name", 
-			"date_posted_parsed",
-			"job_title",
-			"description_text",
-			# "benefits",
-			# "job_type",
-			# "location",
-			# "salary_formatted",
-			# "company_rating",
-			# "company_reviews_count",
-			# "country",
-			# "date_posted",
-			# "description",
-			# "region",
-			"company_link",
-			# "domain",
-			# "url",
-			# "is_expired",
-			# "job_location",
-			# "job_description_formatted",
-			# "logo_url",
-			# "timestamp",
-			# "input"
-		]
-	}
-
-	response = requests.post(api_url, headers=headers, params=params, json=data)
-	response_json = response.json()
-	return response_json['snapshot_id']
-
-# %%
 def extract_job_info_indeed(json_output):
     """
     Extracts all fields from the Bright Data job snapshot JSON output for Indeed jobs.
@@ -261,7 +258,7 @@ def extract_job_info_indeed(json_output):
     return result, result_df
 
 # %%
-def extract_job(job_url: str, api_key: str, max_retries: int = 40, wait_time: int = 5) -> tuple[dict, pd.DataFrame]:
+def extract_job(job_url: str, api_key: str, max_retries: int = 360, wait_time: int = 5) -> tuple[dict, pd.DataFrame]:
     """
     Orchestrates the full job scraping process for LinkedIn or Indeed using Bright Data API.
     
