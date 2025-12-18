@@ -145,7 +145,7 @@ The embedding system converts text documents (resumes, personality profiles, por
   - Command-line interface for processing specific files or resetting the database
 - **Chunking Strategy**:
   - Resume: Personal info (1 chunk), Professional summary (1 chunk), Work experience (per achievement bullet), Education (per degree), Skills (per category)
-  - Personality: Main sections (## headers) and subsections (### headers) as separate chunks
+  - Personality: Fixed-size chunking (400 chars) with sliding window overlap (100 chars) across entire document, no section awareness
 
 ### Data Flow
 
@@ -262,20 +262,27 @@ personality_store = QdrantVectorStore(collection_name="personality")
 query_vector = embedder.embed_query("analytical problem-solving collaborative")
 results = personality_store.search(query_vector, top_k=5)
 
-# Filter out weaknesses (retrieve only personality and strength)
+# All results are personality trait chunks with simple fixed-size structure
 for result in results:
-    if result['section_type'] in ['personality', 'strength']:
-        print(f"Trait: {result['content'][:100]}...")
+    print(f"Content: {result['content'][:100]}...")
+    print(f"Similarity: {result['score']:.3f}")
 ```
 
 ### Collection Architecture
 
 The system uses a **dual-collection architecture** for semantic separation:
 
-| Collection | Contents | Use Case | Section Types |
-|------------|----------|----------|---------------|
-| `resume_data` | Resume information from resume_ale.md | Job-specific resume tailoring | work_experience, education, skills, continuing_studies, personal_info, professional_summary |
-| `personality` | Personality traits from personalities_16.md | Cover letter personalization | personality, strength, weakness |
+| Collection | Contents | Use Case | Storage Structure |
+|------------|----------|----------|-------------------|
+| `resume_data` | Resume information from resume_ale.md | Job-specific resume tailoring | Header-based chunks with rich metadata (section_type: work_experience, education, skills, continuing_studies, personal_info, professional_summary) |
+| `personality` | Personality traits from personalities_16.md | Cover letter personalization | Fixed-size chunks (400 chars, 100 char overlap) with no section_type, simplified metadata |
+
+**Personality Collection Simplification:**
+The personality collection uses simplified fixed-size chunking:
+- No section identification or header parsing
+- No `section_type` field (empty string)
+- No `traits_included` metadata
+- Metadata includes only: `chunk_index`, `char_start`, `char_end`, `overlap_chars`
 
 **Benefits:**
 - **Semantic separation**: Resume facts vs personality traits stored separately
@@ -470,25 +477,28 @@ store = QdrantVectorStore(collection_name="personality")
 personality_traits = retrieve_personality_traits(job_analysis, top_k=5)
 ```
 
-**Output**: Relevant personality traits from personality collection
-```json
-["analytical problem-solver", "collaborative team player", "innovative thinker"]
+**Output**: Deduplicated personality traits text
+```
+Analytical problem-solver with strong collaborative skills...
+Innovative thinker who approaches problems strategically...
 ```
 
 **Collection-Based Retrieval:**
 - Uses the **`personality` collection** (separate from resume_data)
-- No section_type filtering needed during search (all chunks in this collection are personality-related)
-- Still filters OUT `weakness` chunks to avoid negative traits in cover letters
+- Performs pure semantic search without section filtering
+- Deduplicates overlapping chunks based on character ranges
 - More efficient search due to smaller, focused collection
 
 **Personality chunking & embedding details**
 
-- **Source file:** `data/personalities_16.md` — a human-readable markdown document with top-level sections and subsections describing traits, strengths, preferences, and weaknesses.
+- **Source file:** `data/personalities_16.md` — a human-readable markdown document with personality traits, career preferences, and strengths.
 - **Target collection:** `personality` (stored separately from resume data)
 - **Chunking strategy (during `scripts/create_embeddings.py`):**
-  - Main sections (## headers) are parsed as separate `personality` chunks (e.g., "Personality Traits", "Career Preferences").
-  - Subsections (### headers or numbered subheaders under a strengths/weaknesses section) are parsed as separate `strength` or `weakness` chunks depending on the parent section.
-  - Each chunk preserves the full subsection text as `content` and receives metadata such as `source_file`, `section`, `subsection` and `section_type`.
+  - Simple fixed-size chunking: 400 characters per chunk with 100-character sliding window overlap
+  - No header identification or section parsing
+  - Entire document is chunked sequentially without section awareness
+  - Each chunk preserves semantic meaning through overlap
+  - Metadata includes: `chunk_index`, `char_start`, `char_end`, `overlap_chars` (no `section_type`, no `traits_included`)
 
 - **Example chunk (stored in personality collection):**
 ```json
