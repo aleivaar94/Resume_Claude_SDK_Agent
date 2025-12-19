@@ -51,9 +51,10 @@ def create_analysis_prompt(job_title: str, company: str, job_description: str) -
     You are an expert recruiter in the data analytics, data science, and AI engineering fields. Output in JSON format only.
     Your task is to extract the following information from the job details provided:
 
-    1. technical_skills: An array of technical skills required or preferred for the role. Look for specific technologies, programming languages, tools, or technical methodologies mentioned.
-    2. soft_skills: An array of soft skills or personal attributes required or preferred for the role. Identify personal attributes, interpersonal skills, or work style preferences described.
-    3. keywords: An array of keywords relevant to the role, including industry-specific terms, tools, or methodologies. Extract key terms that are frequently mentioned or seem particularly important to the role or industry.
+    1. job_summary: Create a concise 250-word summary of the job posting that captures the essence of the role, key responsibilities, and what the company is looking for. This summary should be clear, professional, and suitable for use in a cover letter.
+    2. technical_skills: An array of technical skills required or preferred for the role. Look for specific technologies, programming languages, tools, or technical methodologies mentioned.
+    3. soft_skills: An array of soft skills or personal attributes required or preferred for the role. Identify personal attributes, interpersonal skills, or work style preferences described.
+    4. keywords: An array of keywords relevant to the role, including industry-specific terms, tools, or methodologies. Extract key terms that are frequently mentioned or seem particularly important to the role or industry.
 
     Here is the job information you need to analyze:
 
@@ -71,9 +72,12 @@ def create_analysis_prompt(job_title: str, company: str, job_description: str) -
 
     Output the information into a JSON object only with the following structure:
 
-    - "technical_skills": ["skill1", "skill2", "skill3"],
-    - "soft_skills": ["skill1", "skill2", "skill3"],
-    - "keywords": ["keyword1", "keyword2", "keyword3"]
+    {{
+        "job_summary": "A 250-word summary of the job posting",
+        "technical_skills": ["skill1", "skill2", "skill3"],
+        "soft_skills": ["skill1", "skill2", "skill3"],
+        "keywords": ["keyword1", "keyword2", "keyword3"]
+    }}
 
     Each array should contain at least 3 items if possible and a maximum of 10, but don't include irrelevant information just to meet this number.
 
@@ -86,6 +90,7 @@ class JobAnalysisResponse(BaseModel):
     technical_skills: List[str] = Field(default_factory=list)
     soft_skills: List[str] = Field(default_factory=list)
     keywords: List[str] = Field(default_factory=list)
+    job_summary: str = Field(default="", description="250-word summary of the job posting")
     
     @model_validator(mode='before')
     @classmethod
@@ -111,6 +116,7 @@ class JobAnalysisResponse(BaseModel):
                 # If we can't extract valid JSON, try to create a structured response
                 # by looking for keyword patterns
                 skills_pattern = {
+                    "job_summary": r'"?job_summary"?\s*:\s*"([^"]*)"',
                     "technical_skills": r'"?technical_skills"?\s*:\s*\[(.*?)\]',
                     "soft_skills": r'"?soft_skills"?\s*:\s*\[(.*?)\]',
                     "keywords": r'"?keywords"?\s*:\s*\[(.*?)\]'
@@ -120,24 +126,29 @@ class JobAnalysisResponse(BaseModel):
                 for key, pattern in skills_pattern.items():
                     match = re.search(pattern, data, re.DOTALL)
                     if match:
-                        # Extract the items in the array
-                        items_text = match.group(1)
-                        # Parse the items, handling quoted strings
-                        items = []
-                        for item in re.findall(r'"([^"]*)"', items_text):
-                            items.append(item)
-                        if items:
-                            extracted_data[key] = items
+                        if key == "job_summary":
+                            # Extract string value for job_summary
+                            extracted_data[key] = match.group(1)
+                        else:
+                            # Extract the items in the array
+                            items_text = match.group(1)
+                            # Parse the items, handling quoted strings
+                            items = []
+                            for item in re.findall(r'"([^"]*)"', items_text):
+                                items.append(item)
+                            if items:
+                                extracted_data[key] = items
                 
                 if extracted_data:
                     return extracted_data
                     
-                # If all else fails, print a warning and return empty lists
+                # If all else fails, print a warning and return empty lists/string
                 print(f"Failed to parse analysis response: {data[:100]}...")
                 return {
                     "technical_skills": [],
                     "soft_skills": [],
-                    "keywords": []
+                    "keywords": [],
+                    "job_summary": ""
                 }
         
         return data
@@ -155,7 +166,16 @@ def claude_analysis(api_key: str, prompt_analysis: str) -> Dict[str, Any]:
     response_text = response.content[0].text
     try:
         analysis_data = JobAnalysisResponse.model_validate(response_text)
-        return analysis_data.model_dump()
+        analysis_dict = analysis_data.model_dump()
+        
+        # Print formatted job analysis result
+        print(f"\n{'='*80}")
+        print("📊 JOB ANALYSIS RESULT")
+        print(f"{'='*80}")
+        print(json.dumps(analysis_dict, indent=2))
+        print(f"{'='*80}\n")
+        
+        return analysis_dict
     except Exception as e:
         print(f"Error parsing response with Pydantic: {e}")
         # Fallback to simpler parsing if Pydantic validation fails
@@ -167,7 +187,8 @@ def claude_analysis(api_key: str, prompt_analysis: str) -> Dict[str, Any]:
             return {
                 "technical_skills": [],
                 "soft_skills": [],
-                "keywords": []
+                "keywords": [],
+                "job_summary": ""
             }
 
 def format_claude_analysis_response(skills_dict):
@@ -1007,7 +1028,7 @@ print("Resume generation functions defined!")
 # %%
 # Cover Letter Generation Functions
 
-def create_cover_letter_prompt(resume_data: Dict[str, Any], job_analysis: Dict[str, Any], job_title: str, company: str, job_description: str, personality_traits: str = "", portfolio_projects: Dict[str, Any] = None) -> str:
+def create_cover_letter_prompt(resume_data: Dict[str, Any], job_analysis: Dict[str, Any], job_title: str, company: str, personality_traits: str = "", portfolio_projects: Dict[str, Any] = None) -> str:
     """
     Generate cover letter prompt with portfolio project integration.
     
@@ -1057,10 +1078,10 @@ def create_cover_letter_prompt(resume_data: Dict[str, Any], job_analysis: Dict[s
     prompt_cover_letter = f"""
     You are an expert cover letter writer specializing in achievement-based writing and keyword optimization. 
 
-    Here is the job description:
-    <job_description>
-    {job_description}
-    </job_description>
+    Here is a summary of the job posting:
+    <job_summary>
+    {job_analysis.get('job_summary', '')}
+    </job_summary>
 
     Here is the candidate's resume data:
     <resume_data>
@@ -1098,7 +1119,7 @@ def create_cover_letter_prompt(resume_data: Dict[str, Any], job_analysis: Dict[s
     </keywords>
 
     Think through your analysis internally (do not output this thinking):
-    - Identify top 5 most important job requirements
+    - Identify top 5 most important job requirements from the job summary
     - Match soft skills to job needs and rank by importance
     - List relevant achievements from resume matching job responsibilities
     - Create skills-requirements matrix rating matches 1-5
@@ -1113,9 +1134,9 @@ def create_cover_letter_prompt(resume_data: Dict[str, Any], job_analysis: Dict[s
     2. Tone: Casual but professional, avoid formal language or clichés
     3. Tense: Present tense (except for past experiences)
     4. Language: Avoid "expert", "skilled", "seasoned", "excited"
-    5. Opening: Attention-grabbing hook
+    5. Opening: Attention-grabbing hook that references the job summary
     6. Body: Highlight soft skills matching job requirements, naturally weave in relevant personality traits and reference 1-2 portfolio projects to demonstrate fit
-    7. Closing: Explain how skills solve industry challenges
+    7. Closing: Explain how skills solve industry challenges mentioned in the job summary
     8. Projects: Include relevant_projects array with portfolio projects (title and URL)
     9. Keywords: Naturally incorporate throughout
     10. Personality: Use provided personality traits to strengthen the narrative and show cultural/role fit
