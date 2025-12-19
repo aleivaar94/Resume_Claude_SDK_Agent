@@ -842,9 +842,9 @@ def retrieve_personality_traits(job_analysis: Dict[str, Any], top_k: int = 12) -
 def create_resume_prompt(resume_data: Dict[str, Any], job_analysis: Dict[str, Any], job_title: str, company: str, job_description: str) -> str:
     # Here the resume_data is from the RAG retrieval
     prompt_resume = f"""
-    You are an expert resume writer tasked with creating a highly targeted, achievement-based resume that aligns precisely with given job requirements while accurately representing a candidate's experience.
+    You are an expert resume writer. Your task is to create a tailored resume that accurately reflects the candidate's qualifications and aligns with the job requirements. Output the resume in the specified JSON format only.
 
-    First, review the following information carefully:
+    First, analyze and understand the following job posting and the candidate's resume:
 
     Job Title
     <job_title>
@@ -883,30 +883,24 @@ def create_resume_prompt(resume_data: Dict[str, Any], job_analysis: Dict[str, An
 
     Think through these steps internally (do not output your analysis):
 
-    1. Professional Summary: 
-       CRITICAL - You must ONLY use terminology, skills, and technologies that explicitly appear in the resume data.
-       
-       Step 1a: Extract ONLY the technologies, tools, and skills explicitly mentioned in the candidate's work experience and continuing studies.
-       Step 1b: From the job description, identify which required skills/technologies match those found in Step 1a.
-       Step 1c: Calculate years of experience ONLY from the resume's work_experience dates for the matching role/field.
-       Step 1d: Draft a 50-word summary using ONLY the intersection from Step 1b.
+    1. Professional Summary:
+        - Create a concise 50-word professional summary that highlights the candidate's relevant experience and skills tailored to the job description.
        
        Constraints:
-       - Do NOT introduce terminology not present in resume data
-       - Do NOT paraphrase resume skills to match job requirements
-       - Do NOT use generic terms like "expert", "skilled", "seasoned", "proficient"
-       - Do NOT claim experience with tools/technologies not in resume
-       - DO use exact terminology from resume when possible
-       - DO focus on demonstrable experience and concrete technologies
-       - DO incorporate keywords from job ONLY if they appear in resume data
-       
-       If a job requirement has no match in resume, omit it from summary.
+       - Use keywords from job ONLY if they appear in resume data
+       - Don't use generic terms like "expert", "skilled", "seasoned", "proficient"
+       - Don't claim experience with tools/technologies not in resume
+       - Use exact terminology from resume when possible
+       - Focus on demonstrable experience and concrete technologies
     
-    2. Work Experience: Select the four most relevant work experiences from resume data including the most recent. Create 3 bullet points for each experience (2 bullet points for quality engineer and quality assurance roles) using strong action verbs and quantified achievements. Ensure each bullet point is relevant to the job requirements.
+    2. Work Experience:
+        - Select the four most relevant work experiences from resume data including the most recent. Create 3 bullet points for each experience (2 bullet points for quality engineer and quality assurance roles) using strong action verbs and quantified achievements. Ensure each bullet point is relevant to the job requirements.
     
-    3. Education: List all educational qualifications from resume data. Note any specific educational requirements from job description. Ensure consistent formatting for all entries.
+    3. Education: 
+        - List all educational qualifications from resume data. Note any specific educational requirements from job description. Ensure consistent formatting for all entries.
     
-    4. Continuing Studies: List all certifications and continuing education courses from resume data. Identify the four most relevant to the job requirements.
+    4. Continuing Studies:
+        - Select the three most relevant to the job requirements.
 
     CRITICAL: Output ONLY a valid JSON object with this exact structure. No text before or after:
 
@@ -936,7 +930,7 @@ def create_resume_prompt(resume_data: Dict[str, Any], job_analysis: Dict[str, An
         ]
     }}
 
-    Don't use "Present" if the end date is before April 2025. Output pure JSON only.
+    Don't use "Present" if the end date is before March 2026. Output pure JSON only.
     """
     return prompt_resume
 
