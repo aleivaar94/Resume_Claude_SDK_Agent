@@ -48,7 +48,12 @@ model_name = "claude-haiku-4-5"
 # Job Analysis Functions
 def create_analysis_prompt(job_title: str, company: str, job_description: str) -> str:
     prompt_analysis = f"""
-    You are an experienced hiring manager tasked with analyzing job descriptions to extract key information. Your goal is to provide accurate and relevant data that can be used in the recruitment process.
+    You are an expert recruiter in the data analytics, data science, and AI engineering fields. Output in JSON format only.
+    Your task is to extract the following information from the job details provided:
+
+    1. technical_skills: An array of technical skills required or preferred for the role. Look for specific technologies, programming languages, tools, or technical methodologies mentioned.
+    2. soft_skills: An array of soft skills or personal attributes required or preferred for the role. Identify personal attributes, interpersonal skills, or work style preferences described.
+    3. keywords: An array of keywords relevant to the role, including industry-specific terms, tools, or methodologies. Extract key terms that are frequently mentioned or seem particularly important to the role or industry.
 
     Here is the job information you need to analyze:
 
@@ -63,12 +68,6 @@ def create_analysis_prompt(job_title: str, company: str, job_description: str) -
     <company>
     {company}
     </company>
-
-    Your task is to extract the following information from the job details provided:
-
-    1. technical_skills: An array of technical skills required or preferred for the role. Look for specific technologies, programming languages, tools, or technical methodologies mentioned.
-    2. soft_skills: An array of soft skills or personal attributes required or preferred for the role. Identify personal attributes, interpersonal skills, or work style preferences described.
-    3. keywords: An array of keywords relevant to the role, including industry-specific terms, tools, or methodologies. Extract key terms that are frequently mentioned or seem particularly important to the role or industry.
 
     Output the information into a JSON object only with the following structure:
 
@@ -842,7 +841,8 @@ def retrieve_personality_traits(job_analysis: Dict[str, Any], top_k: int = 12) -
 def create_resume_prompt(resume_data: Dict[str, Any], job_analysis: Dict[str, Any], job_title: str, company: str, job_description: str) -> str:
     # Here the resume_data is from the RAG retrieval
     prompt_resume = f"""
-    You are an expert resume writer. Your task is to create a tailored resume that accurately reflects the candidate's qualifications and aligns with the job requirements. Output the resume in the specified JSON format only.
+    You are an expert resume writer in the data analytics, data science, and AI engineering fields.
+    Your task is to create a tailored resume that accurately reflects the candidate's qualifications and aligns with the job requirements. Output the resume in the specified JSON format only.
 
     First, analyze and understand the following job posting and the candidate's resume:
 
