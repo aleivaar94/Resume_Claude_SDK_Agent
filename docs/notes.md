@@ -45,3 +45,5 @@ In Qdrant you can also filter by metadata fields:
 Nested objects
 If payload has: {"metadata": {"company": "CFIA"}}
 FieldCondition(key="metadata.company", match=MatchValue(value="CFIA"))
+
+Difference between using parameters in tools vs internalizing (encapsulating) within the tool itself.

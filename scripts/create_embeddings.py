@@ -300,6 +300,107 @@ class MarkdownParser:
         return chunks
     
     @staticmethod
+    def parse_portfolio_projects_hierarchical(content: str, source_file: str) -> List[Dict[str, Any]]:
+        """
+        Parse portfolio projects into hierarchical chunks.
+        
+        Creates two chunk types:
+        1. Technical summary (Tech Stack + Technical Highlights) for filtering
+        2. Full project (all sections) for detailed context
+        
+        Parameters
+        ----------
+        content : str
+            Raw markdown content of portfolio_projects.md.
+        source_file : str
+            Name of source file.
+        
+        Returns
+        -------
+        List[Dict[str, Any]]
+            List of chunks (6 total: 3 technical + 3 full).
+        
+        Examples
+        --------
+        >>> chunks = MarkdownParser.parse_portfolio_projects_hierarchical(content, "portfolio_projects.md")
+        >>> tech_chunks = [c for c in chunks if c["section_type"] == "project_technical"]
+        >>> len(tech_chunks)
+        3
+        >>> full_chunks = [c for c in chunks if c["section_type"] == "project_full"]
+        >>> len(full_chunks)
+        3
+        """
+        chunks = []
+        projects = content.split('\n# ')[1:]  # Split by project headers
+        
+        for idx, project in enumerate(projects):
+            lines = project.strip().split('\n')
+            project_title = lines[0].strip()
+            
+            # Parse sections
+            sections = {}
+            current_section = None
+            section_content = []
+            
+            for line in lines[1:]:
+                if line.startswith('## '):
+                    if current_section:
+                        sections[current_section] = '\n'.join(section_content).strip()
+                    current_section = line[3:].strip()
+                    section_content = []
+                else:
+                    section_content.append(line)
+            
+            if current_section:
+                sections[current_section] = '\n'.join(section_content).strip()
+            
+            # Extract metadata
+            project_url = sections.get('URL', '').strip()
+            tech_stack_raw = sections.get('Tech Stack', '')
+            tech_stack = [t.strip() for t in tech_stack_raw.replace('.', '').split(',') if t.strip()]
+            
+            project_id = f"project_{idx}"
+            
+            # Chunk 1: Technical Summary (Tech Stack + Technical Highlights)
+            tech_content = f"Project: {project_title}\n\n"
+            tech_content += f"Technologies: {sections.get('Tech Stack', 'N/A')}\n\n"
+            tech_content += f"Technical Work:\n{sections.get('Technical Highlights', 'N/A')}"
+            
+            chunks.append({
+                "content": tech_content,
+                "source_file": source_file,
+                "section_type": "project_technical",
+                "metadata": {
+                    "project_title": project_title,
+                    "project_url": project_url,
+                    "project_id": project_id,
+                    "tech_stack": tech_stack,
+                    "chunk_type": "technical_summary"
+                }
+            })
+            
+            # Chunk 2: Full Project (all sections)
+            full_content = f"# {project_title}\n\n"
+            for section_name in ['Purpose', 'Tech Stack', 'Technical Highlights', 'Skills Demonstrated', 'Result/Impact']:
+                if section_name in sections:
+                    full_content += f"## {section_name}\n{sections[section_name]}\n\n"
+            
+            chunks.append({
+                "content": full_content.strip(),
+                "source_file": source_file,
+                "section_type": "project_full",
+                "metadata": {
+                    "project_title": project_title,
+                    "project_url": project_url,
+                    "project_id": project_id,
+                    "tech_stack": tech_stack,
+                    "chunk_type": "full_content"
+                }
+            })
+        
+        return chunks
+    
+    @staticmethod
     def parse_personality_fixed_chunks(
         content: str, 
         source_file: str,
@@ -415,10 +516,13 @@ def process_file(file_path: str, file_type: str) -> Tuple[List[Dict[str, Any]], 
     if source_file == "personalities_16.md":
         print(f"   ✂️  Using fixed-size chunking (400 chars, 100 overlap) for personalities_16.md")
         chunks = MarkdownParser.parse_personality_fixed_chunks(content, source_file)
+    elif source_file == "portfolio_projects.md":
+        print(f"   ✂️  Using hierarchical chunking for portfolio_projects.md")
+        chunks = MarkdownParser.parse_portfolio_projects_hierarchical(content, source_file)
     elif 'resume' in source_file.lower():
         chunks = MarkdownParser.parse_resume_markdown(content, source_file)
     else:
-        raise ValueError(f"Unknown file type: {source_file}. Expected 'personalities_16.md' or resume file.")
+        raise ValueError(f"Unknown file type: {source_file}. Expected 'personalities_16.md', 'portfolio_projects.md', or resume file.")
     
     return chunks, len(content)
 
@@ -471,6 +575,9 @@ def main():
             if 'personalit' in source_file:
                 collection_name = "personality"
                 print(f"📦 Auto-detected collection: personality (from filename)")
+            elif 'portfolio' in source_file or 'project' in source_file:
+                collection_name = "projects"
+                print(f"📦 Auto-detected collection: projects (from filename)")
             elif 'resume' in source_file:
                 collection_name = "resume_data"
                 print(f"📦 Auto-detected collection: resume_data (from filename)")
@@ -500,10 +607,18 @@ def main():
         print(f"   Collection: {collection_name}")
         print(f"   Total documents in collection: {store.count_documents()}")
         print(f"   Section types: {set(c['section_type'] for c in chunks)}")
+        
+        # Additional details for portfolio projects
+        if collection_name == "projects":
+            tech_chunks = [c for c in chunks if c['section_type'] == 'project_technical']
+            full_chunks = [c for c in chunks if c['section_type'] == 'project_full']
+            print(f"   Technical summary chunks: {len(tech_chunks)}")
+            print(f"   Full project chunks: {len(full_chunks)}")
+            print(f"   Projects indexed: {[c['metadata']['project_title'] for c in tech_chunks]}")
     else:
         # Show current state for all collections
         print(f"\n📊 Current database state:")
-        for collection in ["resume_data", "personality"]:
+        for collection in ["resume_data", "personality", "projects"]:
             try:
                 store = QdrantVectorStore(collection_name=collection)
                 count = store.count_documents()

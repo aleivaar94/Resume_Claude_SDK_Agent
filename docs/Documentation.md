@@ -290,6 +290,55 @@ The personality collection uses simplified fixed-size chunking:
 - **Performance**: Smaller collections = faster semantic search
 - **Flexibility**: Can tune retrieval parameters independently per collection
 
+## Portfolio Project Retrieval
+
+This project includes a dedicated two-step, hierarchical retrieval system for portfolio projects used when generating cover letters and highlighting relevant work.
+
+### Chunking Strategy
+- Each project in `portfolio_projects.md` is stored as two chunks:
+  - `project_technical`: short technical summary (tech stack + technical highlights) for fast matching
+  - `project_full`: full project content (purpose, tech stack, highlights, results) for narrative generation
+
+### Payload Schema
+Technical chunk and full chunk payloads include `content`, `source_file`, `section_type` (`project_technical` or `project_full`), and metadata such as `project_title`, `project_url`, `project_id`, and `tech_stack`.
+
+### Two-Step Retrieval Flow
+1. Technical Filtering: query `project_technical` chunks (fast, precise) to identify relevant `project_id`s.
+2. Full Content Retrieval: fetch `project_full` chunks for the top project IDs to include rich context in generation prompts.
+
+Example usage (high-level):
+```python
+# Step 1: Search technical summaries
+tech_results = store.search(query_vector, top_k=10, section_filter="project_technical")
+project_ids = [r["metadata"]["project_id"] for r in tech_results]
+
+# Step 2: Fetch full content for top projects
+projects_for_prompt = [store.search_by_metadata("project_id", pid, section_filter="project_full") for pid in project_ids[:3]]
+```
+
+### Implementation Notes
+- `scripts/create_embeddings.py` includes a parser `parse_portfolio_projects_hierarchical()` that creates the technical and full chunks and stores them in the `projects` collection.
+- `src/core/vector_store.py` exposes `search_by_metadata()` to retrieve full chunks by `project_id`.
+- `src/core/resume_generator.py` provides `retrieve_portfolio_projects_hierarchical()` which orchestrates the two-step retrieval and returns two outputs: `projects_for_prompt` (detailed full content, top 3) and `projects_for_list` (title+URL list, top 5).
+- `src/agent/tools.py` exposes an MCP tool `get_portfolio_projects` that accepts `job_analysis_json` and returns the project lists for use in cover letter generation.
+
+### Testing & Outputs
+- A unit test `test_project_retrieval.py` verifies the two-step flow: technical filtering, full content fetch, and final lists.
+- Typical terminal output when indexing projects:
+```
+📄 Processing file: data/portfolio_projects.md
+✂️  Extracted 6 chunks (3 technical + 3 full)
+✅ Generated 6 embeddings
+✅ Added 6 documents to 'projects'
+```
+
+### Benefits & Future Enhancements
+- Precision: technical chunking improves skill/method matching
+- Context: full chunks provide rich narrative for cover letters
+- Efficiency: two-step approach reduces search work (10 → 3 full retrievals)
+
+Future ideas: multi-query aggregation, Claude re-ranking, dynamic `k`, and tech-stack pre-filtering.
+
 ### Environment Variables
 - **`OPENAI_API_KEY`**: Required for generating embeddings via OpenAI API
 

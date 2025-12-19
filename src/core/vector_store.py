@@ -268,6 +268,68 @@ class QdrantVectorStore:
         
         return results
     
+    def search_by_metadata(
+        self,
+        filter_field: str,
+        filter_value: str,
+        section_filter: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Search for a single document by exact metadata match.
+        
+        Parameters
+        ----------
+        filter_field : str
+            Metadata field to filter on (e.g., "project_id").
+        filter_value : str
+            Exact value to match.
+        section_filter : Optional[str]
+            Filter by section_type if provided.
+        
+        Returns
+        -------
+        Optional[Dict[str, Any]]
+            Matched document with content and metadata, or None.
+        
+        Examples
+        --------
+        >>> store = QdrantVectorStore(collection_name="projects")
+        >>> result = store.search_by_metadata("project_id", "project_0", section_filter="project_full")
+        >>> print(result["metadata"]["project_title"])
+        'Credit Card Offer Analysis'
+        """
+        must_conditions = [
+            FieldCondition(
+                key=f"metadata.{filter_field}",
+                match=MatchValue(value=filter_value)
+            )
+        ]
+        
+        if section_filter:
+            must_conditions.append(
+                FieldCondition(
+                    key="section_type",
+                    match=MatchValue(value=section_filter)
+                )
+            )
+        
+        results = self.client.scroll(
+            collection_name=self.collection_name,
+            scroll_filter=Filter(must=must_conditions),
+            limit=1
+        )
+        
+        if results[0]:
+            point = results[0][0]
+            return {
+                "id": str(point.id),
+                "content": point.payload["content"],
+                "metadata": point.payload["metadata"],
+                "section_type": point.payload["section_type"],
+                "source_file": point.payload["source_file"]
+            }
+        return None
+    
     def delete_collection(self) -> None:
         """
         Delete the collection (useful for resetting/rebuilding).
