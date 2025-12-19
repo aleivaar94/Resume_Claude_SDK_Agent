@@ -7,6 +7,7 @@ from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, create_sdk_mcp
 from src.agent.tools import (
     scrape_job_tool, 
     get_personality_traits_tool,
+    get_portfolio_projects_tool,
     analyze_job_tool, 
     generate_resume_content_tool, 
     generate_cover_letter_content_tool, 
@@ -24,6 +25,7 @@ resume_server = create_sdk_mcp_server(
     tools=[
         scrape_job_tool, 
         get_personality_traits_tool,
+        get_portfolio_projects_tool,
         analyze_job_tool, 
         generate_resume_content_tool, 
         generate_cover_letter_content_tool, 
@@ -63,15 +65,20 @@ You are an expert Resume AI Agent that generates tailored resumes and cover lett
    Returns: file paths to generated documents
    Note: resume_generated_json contains both generated and original data
 
+7. **get_portfolio_projects** - Retrieve relevant portfolio projects
+   Input: job_analysis_json (from analyze_job)
+   Returns: projects_for_prompt (top 3 projects with full content), projects_for_list (top 5 projects with title+URL)
+
 ## TYPICAL WORKFLOW
 
 When a user provides a job URL:
 1. Use `scrape_job` to extract job information
 2. Use `analyze_job` to identify key requirements
 3. Use `get_personality_traits` to retrieve relevant personality traits
-4. Use `generate_resume_content` to create tailored resume
-5. Use `generate_cover_letter_content` to create tailored cover letter
-6. Use `create_documents` to create Word/PDF files
+4. Use `get_portfolio_projects` to retrieve relevant portfolio projects
+5. Use `generate_resume_content` to create tailored resume
+6. Use `generate_cover_letter_content` to create tailored cover letter
+7. Use `create_documents` to create Word/PDF files
 
 ## FLEXIBLE BEHAVIOR - ADAPT TO USER REQUESTS
 
@@ -172,6 +179,7 @@ async def start():
             "mcp__resume_tools__scrape_job", 
             "mcp__resume_tools__get_personality_traits",
             "mcp__resume_tools__analyze_job",
+            "mcp__resume_tools__get_portfolio_projects",
             "mcp__resume_tools__generate_resume_content",
             "mcp__resume_tools__generate_cover_letter_content",
             "mcp__resume_tools__create_documents"

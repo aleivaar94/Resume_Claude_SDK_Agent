@@ -17,7 +17,8 @@ from src.core.resume_generator import (
     convert_word_to_pdf,
     # load_resume_yaml,
     retrieve_resume_context,
-    retrieve_personality_traits
+    retrieve_personality_traits,
+    retrieve_portfolio_projects_hierarchical
 )
 
 # Helper to get API keys
@@ -184,6 +185,95 @@ async def get_personality_traits_tool(args: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "content": [
                 {"type": "text", "text": f"Error retrieving personality traits: {str(e)}"}
+            ],
+            "is_error": True
+        }
+
+@tool(
+    "get_portfolio_projects",
+    "Retrieve relevant portfolio projects using two-step hierarchical search. Pass job_analysis as JSON string. Returns projects for prompt (top 3 with full content) and list (top 5 with title+URL).",
+    {"job_analysis_json": str, "top_k_prompt": int, "top_k_list": int}
+)
+async def get_portfolio_projects_tool(args: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Retrieves relevant portfolio projects using hierarchical RAG search.
+    
+    Step 1: Searches technical summary chunks for top 10 matches.
+    Step 2: Fetches full content for top 3 projects (for cover letter prompt) 
+            and metadata for top 5 projects (for cover letter list).
+    
+    Parameters
+    ----------
+    args : Dict[str, Any]
+        Dictionary containing:
+        - job_analysis_json : str
+            JSON string of job analysis from analyze_job tool.
+        - top_k_prompt : int, optional
+            Number of full projects to return for prompt (default: 3).
+        - top_k_list : int, optional
+            Number of projects to return for list (default: 5).
+    
+    Returns
+    -------
+    Dict[str, Any]
+        MCP tool response containing projects as JSON text.
+    
+    Examples
+    --------
+    Input:
+    {
+        "job_analysis_json": "{\"technical_skills\": [\"Python\", \"Pandas\"], \"keywords\": [\"ETL\", \"data pipeline\"]}",
+        "top_k_prompt": 3,
+        "top_k_list": 5
+    }
+    
+    Output:
+    {
+        "content": [{
+            "type": "text",
+            "text": "{\"projects_for_prompt\": [...], \"projects_for_list\": [...]}"
+        }]
+    }
+    """
+    try:
+        # Parse job analysis
+        job_analysis_json = args["job_analysis_json"]
+        job_analysis = json.loads(job_analysis_json)
+        
+        # Get optional parameters
+        top_k_prompt = args.get("top_k_prompt", 3)
+        top_k_list = args.get("top_k_list", 5)
+        
+        print(f"[get_portfolio_projects_tool] Retrieving projects with top_k_prompt={top_k_prompt}, top_k_list={top_k_list}")
+        
+        # Retrieve projects
+        result = retrieve_portfolio_projects_hierarchical(
+            job_analysis=job_analysis,
+            top_k_technical=10,
+            top_k_prompt=top_k_prompt,
+            top_k_list=top_k_list
+        )
+        
+        # Return as JSON string
+        return {
+            "content": [
+                {"type": "text", "text": json.dumps(result, indent=2)}
+            ]
+        }
+    
+    except json.JSONDecodeError as e:
+        print(f"[get_portfolio_projects_tool] JSON parsing error: {str(e)}")
+        return {
+            "content": [
+                {"type": "text", "text": f"Error: Invalid JSON in job_analysis_json. {str(e)}"}
+            ],
+            "is_error": True
+        }
+    except Exception as e:
+        print(f"[get_portfolio_projects_tool] Error: {str(e)}")
+        return {
+            "content": [
+                {"type": "text", "text": f"Error retrieving portfolio projects: {str(e)}"}
             ],
             "is_error": True
         }
@@ -357,19 +447,20 @@ async def generate_resume_content_tool(args: Dict[str, Any]) -> Dict[str, Any]:
 
 @tool(
     "generate_cover_letter_content", 
-    "Generate tailored cover letter. Pass resume_generated, job_analysis, and personality_traits as JSON strings from previous tool outputs.", 
+    "Generate tailored cover letter with portfolio projects. Pass resume_generated_json, job_analysis_json, personality_traits, and portfolio_projects_json as JSON strings from previous tool outputs.", 
     {
         "resume_generated_json": str, 
         "job_analysis_json": str, 
         "personality_traits": str,
         "job_title": str, 
         "company": str, 
-        "job_description": str
+        "job_description": str,
+        "portfolio_projects_json": str
     }
 )
 async def generate_cover_letter_content_tool(args: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Generates tailored cover letter content using Claude AI.
+    Generates tailored cover letter content with portfolio projects using Claude AI.
     
     Parameters
     ----------
@@ -387,11 +478,13 @@ async def generate_cover_letter_content_tool(args: Dict[str, Any]) -> Dict[str, 
             The company name.
         - job_description : str
             Full job description text.
+        - portfolio_projects_json : str
+            JSON string of portfolio projects from get_portfolio_projects.
     
     Returns
     -------
     Dict[str, Any]
-        MCP tool response containing cover letter paragraphs as JSON text.
+        MCP tool response containing cover letter paragraphs and relevant_projects as JSON text.
     
     Examples
     --------
@@ -399,7 +492,8 @@ async def generate_cover_letter_content_tool(args: Dict[str, Any]) -> Dict[str, 
     {
         "opening_paragraph": "...",
         "body_paragraph": "...",
-        "closing_paragraph": "..."
+        "closing_paragraph": "...",
+        "relevant_projects": [{"title": "...", "url": "..."}]
     }
     """
     try:
@@ -411,6 +505,10 @@ async def generate_cover_letter_content_tool(args: Dict[str, Any]) -> Dict[str, 
         resume_generated = resume_data.get('resume_generated', resume_data)  # Fallback for backward compatibility
         job_analysis = json.loads(args['job_analysis_json'])
         personality_traits = args.get('personality_traits', '')
+        portfolio_projects_json = args.get('portfolio_projects_json', '{}')
+        portfolio_projects = json.loads(portfolio_projects_json) if portfolio_projects_json else None
+        
+        print(f"[generate_cover_letter_content_tool] Portfolio projects: {len(portfolio_projects.get('projects_for_prompt', [])) if portfolio_projects else 0} for prompt, {len(portfolio_projects.get('projects_for_list', [])) if portfolio_projects else 0} for list")
         
         prompt = create_cover_letter_prompt(
             resume_generated,
@@ -418,7 +516,8 @@ async def generate_cover_letter_content_tool(args: Dict[str, Any]) -> Dict[str, 
             args['job_title'],
             args['company'],
             args['job_description'],
-            personality_traits
+            personality_traits,
+            portfolio_projects
         )
         result = claude_cover_letter(get_claude_key(), prompt)
         print("[generate_cover_letter_content_tool] Success")

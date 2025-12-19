@@ -517,6 +517,204 @@ def retrieve_resume_context(
 
 def retrieve_personality_traits(job_analysis: Dict[str, Any], top_k: int = 12) -> str:
     """
+    Retrieve personality traits relevant to job requirements using RAG.
+    
+    Uses semantic search to find personality traits that match the job's
+    soft skills and keywords. Returns formatted text for cover letter inclusion.
+    
+    Parameters
+    ----------
+    job_analysis : Dict[str, Any]
+        Job analysis dictionary containing at minimum:
+        - soft_skills : List[str]
+        - keywords : List[str]
+    top_k : int, optional
+        Number of personality trait chunks to retrieve (default: 12).
+    
+    Returns
+    -------
+    str
+        Formatted personality traits text with section headers and descriptions.
+    
+    Examples
+    --------
+    >>> job_analysis = {
+    ...     "soft_skills": ["collaboration", "problem-solving", "communication"],
+    ...     "keywords": ["team", "analytical", "independent"]
+    ... }
+    >>> traits = retrieve_personality_traits(job_analysis)
+    >>> print(traits[:50])
+    'Innovative Mindset: My ability to see possibilities...'
+    """
+    # Initialize embeddings and vector store
+    embedder = OpenAIEmbeddings()
+    store = QdrantVectorStore(collection_name="personality")
+    
+    # Build query from job analysis
+    soft_skills = job_analysis.get("soft_skills", [])
+    keywords = job_analysis.get("keywords", [])
+    
+    query_text = f"{' '.join(soft_skills)} {' '.join(keywords)}"
+    
+    print(f"\n🔍 Retrieving personality traits...")
+    print(f"   Query: {query_text[:100]}...")
+    
+    # Generate query embedding
+    query_vector = embedder.embed_query(query_text)
+    
+    # Search personality collection
+    results = store.search(query_vector, top_k=top_k)
+    
+    print(f"   ✅ Retrieved {len(results)} personality trait chunks")
+    print(f"   Top match: {results[0]['content'][:80]}... (score: {results[0]['score']:.3f})")
+    
+    # Deduplicate by content to avoid repetition from overlapping chunks
+    seen_starts = set()
+    unique_results = []
+    
+    for result in results:
+        # Use first 50 chars as deduplication key
+        content_start = result["content"][:50]
+        if content_start not in seen_starts:
+            seen_starts.add(content_start)
+            unique_results.append(result)
+    
+    # Format results
+    personality_text = "\n\n".join([r["content"] for r in unique_results])
+    
+    return personality_text
+
+
+def retrieve_portfolio_projects_hierarchical(
+    job_analysis: Dict[str, Any],
+    top_k_technical: int = 10,
+    top_k_prompt: int = 3,
+    top_k_list: int = 5
+) -> Dict[str, Any]:
+    """
+    Retrieve portfolio projects using two-step hierarchical search.
+    
+    Step 1: Query technical summary chunks to get top 10 technically relevant projects.
+    Step 2: Fetch full content for top 3 (for cover letter prompt) and metadata for top 5 (for list).
+    
+    Parameters
+    ----------
+    job_analysis : Dict[str, Any]
+        Job analysis containing technical_skills and keywords.
+    top_k_technical : int, optional
+        Number of technical chunks to retrieve in first pass (default: 10).
+    top_k_prompt : int, optional
+        Number of full projects to include in cover letter prompt (default: 3).
+    top_k_list : int, optional
+        Number of projects to list at end of cover letter (default: 5).
+    
+    Returns
+    -------
+    Dict[str, Any]
+        {
+            "projects_for_prompt": List[Dict] with title, content, url (top 3),
+            "projects_for_list": List[Dict] with title, url (top 5)
+        }
+    
+    Examples
+    --------
+    >>> job_analysis = {
+    ...     "technical_skills": ["Python", "Pandas", "SQL"],
+    ...     "keywords": ["data pipeline", "ETL", "financial analysis"]
+    ... }
+    >>> result = retrieve_portfolio_projects_hierarchical(job_analysis)
+    >>> len(result["projects_for_prompt"])
+    3
+    >>> len(result["projects_for_list"])
+    5
+    >>> print(result["projects_for_prompt"][0]["title"])
+    'Credit Card Offer Analysis'
+    """
+    # Initialize embeddings and vector store
+    embedder = OpenAIEmbeddings()
+    store = QdrantVectorStore(collection_name="projects")
+    
+    # Build query from job analysis
+    technical_skills = job_analysis.get("technical_skills", [])
+    keywords = job_analysis.get("keywords", [])
+    
+    query_text = f"{' '.join(technical_skills)} {' '.join(keywords)}"
+    
+    print(f"\n🔍 Step 1: Retrieving technically relevant projects...")
+    print(f"   Query: {query_text[:100]}...")
+    
+    # Generate query embedding
+    query_vector = embedder.embed_query(query_text)
+    
+    # Step 1: Search technical summary chunks
+    tech_results = store.search(
+        query_vector,
+        top_k=top_k_technical,
+        section_filter="project_technical"
+    )
+    
+    print(f"   ✅ Retrieved {len(tech_results)} technical summary chunks")
+    if tech_results:
+        print(f"   Top match: {tech_results[0]['metadata']['project_title']} (score: {tech_results[0]['score']:.3f})")
+        print(f"\n   📋 Technical chunks retrieved:")
+        for idx, r in enumerate(tech_results, 1):
+            print(f"      {idx}. {r['metadata']['project_title']} (score: {r['score']:.3f})")
+    
+    # Extract unique project IDs (preserve ranking)
+    seen = set()
+    project_ids = []
+    for r in tech_results:
+        pid = r["metadata"]["project_id"]
+        if pid not in seen:
+            project_ids.append(pid)
+            seen.add(pid)
+    
+    print(f"\n   🎯 Unique projects identified: {len(project_ids)}")
+    
+    # Step 2a: Get full content for top projects (for prompt)
+    print(f"\n🔍 Step 2: Fetching full project content...")
+    projects_for_prompt = []
+    for idx, pid in enumerate(project_ids[:top_k_prompt], 1):
+        full_result = store.search_by_metadata(
+            filter_field="project_id",
+            filter_value=pid,
+            section_filter="project_full"
+        )
+        if full_result:
+            projects_for_prompt.append({
+                "title": full_result["metadata"]["project_title"],
+                "content": full_result["content"],
+                "url": full_result["metadata"]["project_url"]
+            })
+            print(f"   ✅ {idx}. {full_result['metadata']['project_title']}")
+            print(f"      Content length: {len(full_result['content'])} chars")
+    
+    # Step 2b: Get metadata for top projects (for list)
+    projects_for_list = []
+    for pid in project_ids[:top_k_list]:
+        # Fetch from either chunk type (just need metadata)
+        result = store.search_by_metadata(
+            filter_field="project_id",
+            filter_value=pid
+        )
+        if result:
+            projects_for_list.append({
+                "title": result["metadata"]["project_title"],
+                "url": result["metadata"]["project_url"]
+            })
+    
+    print(f"\n📊 Retrieval Summary:")
+    print(f"   Projects for prompt (full content): {len(projects_for_prompt)}")
+    print(f"   Projects for list (title + URL): {len(projects_for_list)}")
+    
+    return {
+        "projects_for_prompt": projects_for_prompt,
+        "projects_for_list": projects_for_list
+    }
+
+
+def retrieve_personality_traits(job_analysis: Dict[str, Any], top_k: int = 12) -> str:
+    """
     Retrieve relevant personality traits for cover letter enhancement.
     
     Uses the "personality" collection in Qdrant with pure semantic search
@@ -816,7 +1014,53 @@ print("Resume generation functions defined!")
 # %%
 # Cover Letter Generation Functions
 
-def create_cover_letter_prompt(resume_data: Dict[str, Any], job_analysis: Dict[str, Any], job_title: str, company: str, job_description: str, personality_traits: str = "") -> str:
+def create_cover_letter_prompt(resume_data: Dict[str, Any], job_analysis: Dict[str, Any], job_title: str, company: str, job_description: str, personality_traits: str = "", portfolio_projects: Dict[str, Any] = None) -> str:
+    """
+    Generate cover letter prompt with portfolio project integration.
+    
+    Parameters
+    ----------
+    resume_data : Dict[str, Any]
+        Generated resume content.
+    job_analysis : Dict[str, Any]
+        Job analysis with technical_skills, soft_skills, keywords.
+    job_title : str
+        Job title.
+    company : str
+        Company name.
+    job_description : str
+        Full job description text.
+    personality_traits : str, optional
+        Relevant personality traits text.
+    portfolio_projects : Dict[str, Any], optional
+        Portfolio projects from get_portfolio_projects tool with keys:
+        - projects_for_prompt: List[Dict] (top 3 with full content)
+        - projects_for_list: List[Dict] (top 5 with title+URL)
+    
+    Returns
+    -------
+    str
+        Cover letter generation prompt.
+    """
+    # Format portfolio projects for prompt
+    projects_context = ""
+    projects_list = ""
+    
+    if portfolio_projects:
+        # Extract projects for narrative
+        if portfolio_projects.get('projects_for_prompt'):
+            projects_context = "\n\n".join([
+                f"### {p['title']}\n{p['content']}" 
+                for p in portfolio_projects['projects_for_prompt']
+            ])
+        
+        # Extract projects for list
+        if portfolio_projects.get('projects_for_list'):
+            projects_list = "\n".join([
+                f"- {p['title']}: {p['url']}" 
+                for p in portfolio_projects['projects_for_list']
+            ])
+    
     prompt_cover_letter = f"""
     You are an expert cover letter writer specializing in achievement-based writing and keyword optimization. 
 
@@ -845,6 +1089,11 @@ def create_cover_letter_prompt(resume_data: Dict[str, Any], job_analysis: Dict[s
     {personality_traits if personality_traits else "No specific personality traits provided."}
     </personality_traits>
 
+    Here are the candidate's relevant portfolio projects:
+    <portfolio_projects_context>
+    {projects_context if projects_context else "No portfolio projects provided."}
+    </portfolio_projects_context>
+
     Here are the relevant soft skills:
     <soft_skills>
     {json.dumps(job_analysis['soft_skills'])}
@@ -867,36 +1116,48 @@ def create_cover_letter_prompt(resume_data: Dict[str, Any], job_analysis: Dict[s
 
     Now craft a cover letter following these guidelines:
 
-    1. Structure: 3 short paragraphs (opening, body, closing) under 250 words total
+    1. Structure: 3 short paragraphs (opening, body, closing) + projects list, under 250 words total
     2. Tone: Casual but professional, avoid formal language or clichés
     3. Tense: Present tense (except for past experiences)
     4. Language: Avoid "expert", "skilled", "seasoned", "excited"
     5. Opening: Attention-grabbing hook
-    6. Body: Highlight soft skills matching job requirements, naturally weave in relevant personality traits to demonstrate fit
+    6. Body: Highlight soft skills matching job requirements, naturally weave in relevant personality traits and reference 1-2 portfolio projects to demonstrate fit
     7. Closing: Explain how skills solve industry challenges
-    8. Keywords: Naturally incorporate throughout
-    9. Personality: Use provided personality traits to strengthen the narrative and show cultural/role fit
-    10. Relevance: Only use information from resume matching job requirements
-    11. Timeline: Accurately represent work experience dates
+    8. Projects: Include relevant_projects array with portfolio projects (title and URL)
+    9. Keywords: Naturally incorporate throughout
+    10. Personality: Use provided personality traits to strengthen the narrative and show cultural/role fit
+    11. Relevance: Only use information from resume matching job requirements
+    12. Timeline: Accurately represent work experience dates
 
     CRITICAL: Output ONLY a valid JSON object with this exact structure. No text before or after:
 
     {{
         "opening_paragraph": "string (single paragraph)",
-        "body_paragraph": "string (single paragraph)",
-        "closing_paragraph": "string (single paragraph)"
+        "body_paragraph": "string (single paragraph, mention 1-2 portfolio projects if provided)",
+        "closing_paragraph": "string (single paragraph)",
+        "relevant_projects": [
+            {{"title": "string", "url": "string"}},
+            {{"title": "string", "url": "string"}}
+        ]
     }}
 
+    Use the portfolio projects list provided above for the relevant_projects array. If no projects provided, return empty array.
     Do not include analysis tags, explanations, or any other text. Output pure JSON only.
     """
     return prompt_cover_letter
 
 # Cover Letter Generation Data Validation
+class ProjectReference(BaseModel):
+    """Model for portfolio project references in cover letter."""
+    title: str
+    url: str
+
 class CoverLetterResponse(BaseModel):
     """Model for the cover letter response structure."""
     opening_paragraph: str = "Unable to generate opening paragraph."
     body_paragraph: str = "Unable to generate body paragraph."
     closing_paragraph: str = "Unable to generate closing paragraph."
+    relevant_projects: List[ProjectReference] = Field(default_factory=list)
     
     @model_validator(mode='before')
     @classmethod
