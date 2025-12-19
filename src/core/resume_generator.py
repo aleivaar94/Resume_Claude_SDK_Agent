@@ -77,7 +77,6 @@ def create_analysis_prompt(job_title: str, company: str, job_description: str) -
 
     Each array should contain at least 3 items if possible and a maximum of 10, but don't include irrelevant information just to meet this number.
 
-    Remember to focus on accuracy and relevance in your analysis and output.
     """
     return prompt_analysis
 
