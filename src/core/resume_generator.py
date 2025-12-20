@@ -1058,7 +1058,6 @@ def create_cover_letter_prompt(resume_data: Dict[str, Any], job_analysis: Dict[s
     """
     # Format portfolio projects for prompt
     projects_context = ""
-    projects_list = ""
     
     if portfolio_projects:
         # Extract projects for narrative
@@ -1066,13 +1065,6 @@ def create_cover_letter_prompt(resume_data: Dict[str, Any], job_analysis: Dict[s
             projects_context = "\n\n".join([
                 f"### {p['title']}\n{p['content']}" 
                 for p in portfolio_projects['projects_for_prompt']
-            ])
-        
-        # Extract projects for list
-        if portfolio_projects.get('projects_for_list'):
-            projects_list = "\n".join([
-                f"- {p['title']}: {p['url']}" 
-                for p in portfolio_projects['projects_for_list']
             ])
     
     prompt_cover_letter = f"""
@@ -1137,41 +1129,29 @@ def create_cover_letter_prompt(resume_data: Dict[str, Any], job_analysis: Dict[s
     5. Opening: Attention-grabbing hook that references the job summary
     6. Body: Highlight soft skills matching job requirements, naturally weave in relevant personality traits and reference 1-2 portfolio projects to demonstrate fit
     7. Closing: Explain how skills solve industry challenges mentioned in the job summary
-    8. Projects: Include relevant_projects array with portfolio projects (title and URL)
-    9. Keywords: Naturally incorporate throughout
-    10. Personality: Use provided personality traits to strengthen the narrative and show cultural/role fit
-    11. Relevance: Only use information from resume matching job requirements
-    12. Timeline: Accurately represent work experience dates
+    8. Keywords: Naturally incorporate throughout
+    9. Personality: Use provided personality traits to strengthen the narrative and show cultural/role fit
+    10. Relevance: Only use information from resume matching job requirements
+    11. Timeline: Accurately represent work experience dates
 
     CRITICAL: Output ONLY a valid JSON object with this exact structure. No text before or after:
 
     {{
         "opening_paragraph": "string (single paragraph)",
         "body_paragraph": "string (single paragraph, mention 1-2 portfolio projects if provided)",
-        "closing_paragraph": "string (single paragraph)",
-        "relevant_projects": [
-            {{"title": "string", "url": "string"}},
-            {{"title": "string", "url": "string"}}
-        ]
+        "closing_paragraph": "string (single paragraph)"
     }}
 
-    Use the portfolio projects list provided above for the relevant_projects array. If no projects provided, return empty array.
     Do not include analysis tags, explanations, or any other text. Output pure JSON only.
     """
     return prompt_cover_letter
 
 # Cover Letter Generation Data Validation
-class ProjectReference(BaseModel):
-    """Model for portfolio project references in cover letter."""
-    title: str
-    url: str
-
 class CoverLetterResponse(BaseModel):
     """Model for the cover letter response structure."""
     opening_paragraph: str = "Unable to generate opening paragraph."
     body_paragraph: str = "Unable to generate body paragraph."
     closing_paragraph: str = "Unable to generate closing paragraph."
-    relevant_projects: List[ProjectReference] = Field(default_factory=list)
     
     @model_validator(mode='before')
     @classmethod
@@ -1462,12 +1442,13 @@ def _add_resume_section(doc: Document, resume: Dict[str, Any], resume_ale: Dict[
         completion_date.bold = True
 
 
-def _add_cover_letter_section(doc: Document, cover_letter: Dict[str, Any], resume_ale: Dict[str, Any], company: str) -> None:
+def _add_cover_letter_section(doc: Document, cover_letter: Dict[str, Any], resume_ale: Dict[str, Any], company: str, portfolio_projects: Optional[Dict[str, Any]] = None) -> None:
     """
     Add cover letter content section to a Word document.
     
     This helper function adds a complete cover letter section including header with
-    contact information, date, company name, greeting, and three content paragraphs.
+    contact information, date, company name, greeting, three content paragraphs,
+    and portfolio projects list.
     
     Parameters
     ----------
@@ -1482,6 +1463,9 @@ def _add_cover_letter_section(doc: Document, cover_letter: Dict[str, Any], resum
         Candidate's base resume data from YAML file containing personal_information.
     company : str
         Company name for the cover letter recipient.
+    portfolio_projects : Optional[Dict[str, Any]], optional
+        Portfolio projects from vector store with keys:
+        - projects_for_list: List[Dict] with title and url
     
     Returns
     -------
@@ -1495,12 +1479,13 @@ def _add_cover_letter_section(doc: Document, cover_letter: Dict[str, Any], resum
     - Greeting uses "Dear Hiring Manager:"
     - Three paragraphs: opening, body, closing (12pt spacing between)
     - Signature includes "Sincerely," and candidate name
+    - Portfolio projects list appears after signature if projects_for_list exists
     - Phone number: 778.223.8536
     
     Examples
     --------
     >>> doc = _setup_document()
-    >>> _add_cover_letter_section(doc, cover_letter_data, base_data, "Tech Corp")
+    >>> _add_cover_letter_section(doc, cover_letter_data, base_data, "Tech Corp", portfolio_projects)
     """
     # Name
     title = doc.add_paragraph()
@@ -1571,6 +1556,21 @@ def _add_cover_letter_section(doc: Document, cover_letter: Dict[str, Any], resum
     signature = doc.add_paragraph()
     signature.alignment = WD_ALIGN_PARAGRAPH.LEFT
     signature.add_run('Sincerely,\n\nAlejandro Leiva')
+    signature.paragraph_format.space_after = Pt(24)
+    
+    # Portfolio projects list (if available)
+    if portfolio_projects and portfolio_projects.get('projects_for_list') and len(portfolio_projects['projects_for_list']) > 0:
+        projects_header = doc.add_paragraph()
+        projects_header.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        projects_header.add_run("Here is a list of relevant portfolio projects:").bold = True
+        projects_header.paragraph_format.space_after = Pt(6)
+        
+        for project in portfolio_projects['projects_for_list']:
+            project_item = doc.add_paragraph()
+            project_item.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            project_item.add_run(f"- {project['title']}: {project['url']}")
+            project_item.paragraph_format.space_after = Pt(6)
+            project_item.paragraph_format.left_indent = Inches(0.25)
 
 
 def create_resume_document(resume: Dict[str, Any], resume_ale: Dict[str, Any]) -> Document:
@@ -1612,7 +1612,7 @@ def create_resume_document(resume: Dict[str, Any], resume_ale: Dict[str, Any]) -
     return doc
 
 
-def create_cover_letter_document(cover_letter: Dict[str, Any], resume_ale: Dict[str, Any], company: str) -> Document:
+def create_cover_letter_document(cover_letter: Dict[str, Any], resume_ale: Dict[str, Any], company: str, portfolio_projects: Optional[Dict[str, Any]] = None) -> Document:
     """
     Create a Word document containing only a cover letter.
     
@@ -1630,6 +1630,8 @@ def create_cover_letter_document(cover_letter: Dict[str, Any], resume_ale: Dict[
         Candidate's base resume data from YAML file containing personal_information.
     company : str
         Company name for the cover letter recipient.
+    portfolio_projects : Optional[Dict[str, Any]], optional
+        Portfolio projects from vector store with projects_for_list.
     
     Returns
     -------
@@ -1644,15 +1646,15 @@ def create_cover_letter_document(cover_letter: Dict[str, Any], resume_ale: Dict[
     --------
     Create a cover letter document:
     
-    >>> doc = create_cover_letter_document(cover_letter_data, base_data, "Tech Corp")
+    >>> doc = create_cover_letter_document(cover_letter_data, base_data, "Tech Corp", portfolio_projects)
     >>> doc.save('cover_letter.docx')
     """
     doc = _setup_document()
-    _add_cover_letter_section(doc, cover_letter, resume_ale, company)
+    _add_cover_letter_section(doc, cover_letter, resume_ale, company, portfolio_projects)
     return doc
 
 
-def create_resume_coverletter(resume: Dict[str, Any], resume_ale: Dict[str, Any], cover_letter: Dict[str, Any], company: str) -> Document:
+def create_resume_coverletter(resume: Dict[str, Any], resume_ale: Dict[str, Any], cover_letter: Dict[str, Any], company: str, portfolio_projects: Optional[Dict[str, Any]] = None) -> Document:
     """
     Create a Word document containing both resume and cover letter.
     
@@ -1676,6 +1678,8 @@ def create_resume_coverletter(resume: Dict[str, Any], resume_ale: Dict[str, Any]
         - closing_paragraph: str
     company : str
         Company name for the cover letter recipient.
+    portfolio_projects : Optional[Dict[str, Any]], optional
+        Portfolio projects from vector store with projects_for_list.
     
     Returns
     -------
@@ -1695,7 +1699,7 @@ def create_resume_coverletter(resume: Dict[str, Any], resume_ale: Dict[str, Any]
     --------
     Create a complete application package:
     
-    >>> doc = create_resume_coverletter(resume_data, base_data, cover_letter_data, "Tech Corp")
+    >>> doc = create_resume_coverletter(resume_data, base_data, cover_letter_data, "Tech Corp", portfolio_projects)
     >>> doc.save('application.docx')
     """
     # Setup document with standard formatting
@@ -1712,7 +1716,7 @@ def create_resume_coverletter(resume: Dict[str, Any], resume_ale: Dict[str, Any]
         doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
     
     # Add cover letter section
-    _add_cover_letter_section(doc, cover_letter, resume_ale, company)
+    _add_cover_letter_section(doc, cover_letter, resume_ale, company, portfolio_projects)
     
     return doc
 

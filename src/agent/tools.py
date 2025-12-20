@@ -481,7 +481,13 @@ async def generate_cover_letter_content_tool(args: Dict[str, Any]) -> Dict[str, 
     Returns
     -------
     Dict[str, Any]
-        MCP tool response containing cover letter paragraphs and relevant_projects as JSON text.
+        MCP tool response containing cover letter paragraphs as JSON text.
+        Format: {"opening_paragraph": "...", "body_paragraph": "...", "closing_paragraph": "..."}
+    
+    Notes
+    -----
+    The output contains ONLY the cover letter paragraphs. Portfolio projects
+    should be passed separately to create_documents tool.
     
     Examples
     --------
@@ -489,8 +495,7 @@ async def generate_cover_letter_content_tool(args: Dict[str, Any]) -> Dict[str, 
     {
         "opening_paragraph": "...",
         "body_paragraph": "...",
-        "closing_paragraph": "...",
-        "relevant_projects": [{"title": "...", "url": "..."}]
+        "closing_paragraph": "..."
     }
     """
     try:
@@ -516,7 +521,10 @@ async def generate_cover_letter_content_tool(args: Dict[str, Any]) -> Dict[str, 
             portfolio_projects
         )
         result = claude_cover_letter(get_claude_key(), prompt)
+        
         print("[generate_cover_letter_content_tool] Success")
+        
+        # Return ONLY the cover letter content (flat structure with 3 paragraph keys)
         return {
             "content": [
                 {"type": "text", "text": json.dumps(result, indent=2)}
@@ -541,10 +549,11 @@ async def generate_cover_letter_content_tool(args: Dict[str, Any]) -> Dict[str, 
 
 @tool(
     "create_documents", 
-    "Create Word and PDF documents. Supports 'both', 'resume_only', or 'cover_letter_only'. Pass resume_generated_json from generate_resume_content (contains both generated and original data). Returns absolute file paths.", 
+    "Create Word and PDF documents. Supports 'both', 'resume_only', or 'cover_letter_only'. Pass resume_generated_json from generate_resume_content (contains both generated and original data) and portfolio_projects_json for cover letter. Returns absolute file paths.", 
     {
         "resume_generated_json": str, 
         "cover_letter_generated_json": str, 
+        "portfolio_projects_json": str,
         "company": str, 
         "job_title": str,
         "document_type": str
@@ -559,11 +568,11 @@ async def create_documents_tool(args: Dict[str, Any]) -> Dict[str, Any]:
     args : Dict[str, Any]
         Dictionary containing:
         - resume_generated_json : str
-            JSON string of generated resume content.
-        - resume_original_json : str
-            JSON string of original resume data (for personal info).
+            JSON string of generated resume content from generate_resume_content.
         - cover_letter_generated_json : str
-            JSON string of generated cover letter (optional for resume_only).
+            JSON string from generate_cover_letter_content (flat structure with opening_paragraph, body_paragraph, closing_paragraph).
+        - portfolio_projects_json : str
+            JSON string from get_portfolio_projects (contains projects_for_list for document generation).
         - company : str
             Company name for filename.
         - job_title : str
@@ -584,6 +593,7 @@ async def create_documents_tool(args: Dict[str, Any]) -> Dict[str, Any]:
     Creates files in the 'output/' directory.
     Requires docx2pdf for PDF conversion (Windows only).
     File naming includes document type suffix for single-document outputs.
+    Portfolio projects list is added to cover letter after signature using data from vector store.
     
     Examples
     --------
@@ -606,10 +616,24 @@ async def create_documents_tool(args: Dict[str, Any]) -> Dict[str, Any]:
         resume_generated = resume_data['resume_generated']
         resume_original = resume_data['resume_original']
         
+        # Parse portfolio_projects if provided
+        portfolio_projects = None
+        portfolio_projects_json = args.get('portfolio_projects_json', '{}')
+        if portfolio_projects_json and portfolio_projects_json != '{}':
+            portfolio_projects = json.loads(portfolio_projects_json)
+        
         # Cover letter is optional for resume_only
         cover_letter_generated = None
         if document_type in ['both', 'cover_letter_only']:
             cover_letter_generated = json.loads(args['cover_letter_generated_json'])
+            
+            # Validate cover letter structure (flat with 3 paragraph keys)
+            required_keys = ['opening_paragraph', 'body_paragraph', 'closing_paragraph']
+            missing_keys = [key for key in required_keys if key not in cover_letter_generated]
+            if missing_keys:
+                raise KeyError(f"Cover letter missing required keys: {missing_keys}. Got keys: {list(cover_letter_generated.keys())}")
+            
+            print(f"[create_documents_tool] Cover letter keys: {list(cover_letter_generated.keys())}")
         
         company = args['company']
         job_title = args['job_title']
@@ -638,14 +662,15 @@ async def create_documents_tool(args: Dict[str, Any]) -> Dict[str, Any]:
             doc = create_resume_document(resume_generated, resume_original)
             message = "Resume document created successfully."
         elif document_type == "cover_letter_only":
-            doc = create_cover_letter_document(cover_letter_generated, resume_original, company)
+            doc = create_cover_letter_document(cover_letter_generated, resume_original, company, portfolio_projects)
             message = "Cover letter document created successfully."
         else:  # both
             doc = create_resume_coverletter(
                 resume_generated, 
                 resume_original, 
                 cover_letter_generated, 
-                company
+                company,
+                portfolio_projects
             )
             message = "Resume and cover letter documents created successfully."
         
