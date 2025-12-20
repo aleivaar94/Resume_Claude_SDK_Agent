@@ -549,14 +549,15 @@ async def generate_cover_letter_content_tool(args: Dict[str, Any]) -> Dict[str, 
 
 @tool(
     "create_documents", 
-    "Create Word and PDF documents. Supports 'both', 'resume_only', or 'cover_letter_only'. Pass resume_generated_json from generate_resume_content (contains both generated and original data) and portfolio_projects_json for cover letter. Returns absolute file paths.", 
+    "Create Word and PDF documents. Supports 'both', 'resume_only', or 'cover_letter_only'. Pass resume_generated_json from generate_resume_content (contains both generated and original data) and portfolio_projects_json for cover letter. Optional hiring_manager_greeting allows custom greeting (e.g., 'Dear Alice Rid:') instead of default 'Dear Hiring Manager:'. Returns absolute file paths.", 
     {
         "resume_generated_json": str, 
         "cover_letter_generated_json": str, 
         "portfolio_projects_json": str,
         "company": str, 
         "job_title": str,
-        "document_type": str
+        "document_type": str,
+        "hiring_manager_greeting": str
     }
 )
 async def create_documents_tool(args: Dict[str, Any]) -> Dict[str, Any]:
@@ -607,6 +608,12 @@ async def create_documents_tool(args: Dict[str, Any]) -> Dict[str, Any]:
     try:
         # Get document type (default to 'both')
         document_type = args.get('document_type', 'both').lower()
+        
+        # Get optional hiring manager greeting (default to 'Dear Hiring Manager:')
+        hiring_manager_greeting = args.get('hiring_manager_greeting', 'Dear Hiring Manager:')
+        # Ensure greeting ends with colon
+        if not hiring_manager_greeting.endswith(':'):
+            hiring_manager_greeting += ':'
         
         print(f"[create_documents_tool] Creating {document_type} for: {args['job_title']} at {args['company']}")
         
@@ -662,15 +669,16 @@ async def create_documents_tool(args: Dict[str, Any]) -> Dict[str, Any]:
             doc = create_resume_document(resume_generated, resume_original)
             message = "Resume document created successfully."
         elif document_type == "cover_letter_only":
-            doc = create_cover_letter_document(cover_letter_generated, resume_original, company, portfolio_projects)
+            doc = create_cover_letter_document(cover_letter_generated, resume_original, company, portfolio_projects, hiring_manager_greeting)
             message = "Cover letter document created successfully."
         else:  # both
             doc = create_resume_coverletter(
                 resume_generated, 
                 resume_original, 
-                cover_letter_generated, 
+                cover_letter_generated,
                 company,
-                portfolio_projects
+                portfolio_projects,
+                hiring_manager_greeting
             )
             message = "Resume and cover letter documents created successfully."
         

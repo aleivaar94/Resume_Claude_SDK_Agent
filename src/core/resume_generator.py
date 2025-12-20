@@ -1442,7 +1442,7 @@ def _add_resume_section(doc: Document, resume: Dict[str, Any], resume_ale: Dict[
         completion_date.bold = True
 
 
-def _add_cover_letter_section(doc: Document, cover_letter: Dict[str, Any], resume_ale: Dict[str, Any], company: str, portfolio_projects: Optional[Dict[str, Any]] = None) -> None:
+def _add_cover_letter_section(doc: Document, cover_letter: Dict[str, Any], resume_ale: Dict[str, Any], company: str, portfolio_projects: Optional[Dict[str, Any]] = None, hiring_manager_greeting: str = "Dear Hiring Manager:") -> None:
     """
     Add cover letter content section to a Word document.
     
@@ -1531,7 +1531,7 @@ def _add_cover_letter_section(doc: Document, cover_letter: Dict[str, Any], resum
     # Greeting
     greeting = doc.add_paragraph()
     greeting.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    greeting.add_run('Dear Hiring Manager:')
+    greeting.add_run(hiring_manager_greeting)
     greeting.paragraph_format.space_after = Pt(12)
     
     # Opening paragraph
@@ -1612,7 +1612,7 @@ def create_resume_document(resume: Dict[str, Any], resume_ale: Dict[str, Any]) -
     return doc
 
 
-def create_cover_letter_document(cover_letter: Dict[str, Any], resume_ale: Dict[str, Any], company: str, portfolio_projects: Optional[Dict[str, Any]] = None) -> Document:
+def create_cover_letter_document(cover_letter: Dict[str, Any], resume_ale: Dict[str, Any], company: str, portfolio_projects: Optional[Dict[str, Any]] = None, hiring_manager_greeting: str = "Dear Hiring Manager:") -> Document:
     """
     Create a Word document containing only a cover letter.
     
@@ -1650,11 +1650,11 @@ def create_cover_letter_document(cover_letter: Dict[str, Any], resume_ale: Dict[
     >>> doc.save('cover_letter.docx')
     """
     doc = _setup_document()
-    _add_cover_letter_section(doc, cover_letter, resume_ale, company, portfolio_projects)
+    _add_cover_letter_section(doc, cover_letter, resume_ale, company, portfolio_projects, hiring_manager_greeting)
     return doc
 
 
-def create_resume_coverletter(resume: Dict[str, Any], resume_ale: Dict[str, Any], cover_letter: Dict[str, Any], company: str, portfolio_projects: Optional[Dict[str, Any]] = None) -> Document:
+def create_resume_coverletter(resume: Dict[str, Any], resume_ale: Dict[str, Any], cover_letter: Dict[str, Any], company: str, portfolio_projects: Optional[Dict[str, Any]] = None, hiring_manager_greeting: str = "Dear Hiring Manager:") -> Document:
     """
     Create a Word document containing both resume and cover letter.
     
@@ -1716,7 +1716,7 @@ def create_resume_coverletter(resume: Dict[str, Any], resume_ale: Dict[str, Any]
         doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
     
     # Add cover letter section
-    _add_cover_letter_section(doc, cover_letter, resume_ale, company, portfolio_projects)
+    _add_cover_letter_section(doc, cover_letter, resume_ale, company, portfolio_projects, hiring_manager_greeting)
     
     return doc
 

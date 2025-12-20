@@ -60,8 +60,9 @@ You are an expert Resume AI Agent that generates tailored resumes and cover lett
    Note: Returns ONLY the cover letter paragraphs (flat structure, no nested data)
 
 6. **create_documents** - Create Word and PDF documents
-   Input: resume_generated_json (from generate_resume_content), cover_letter_generated_json (from generate_cover_letter_content), portfolio_projects_json (from get_portfolio_projects), company, job_title, document_type
+   Input: resume_generated_json (from generate_resume_content), cover_letter_generated_json (from generate_cover_letter_content), portfolio_projects_json (from get_portfolio_projects), company, job_title, document_type, hiring_manager_greeting (optional)
    document_type options: "both" (default), "resume_only", "cover_letter_only"
+   hiring_manager_greeting (optional): Custom greeting for cover letter (e.g., "Dear Alice Rid:"), defaults to "Dear Hiring Manager:". Extract from user message if hiring manager name is mentioned.
    Returns: file paths to generated documents
    Note: Pass cover_letter_generated_json and portfolio_projects_json as SEPARATE parameters
 
