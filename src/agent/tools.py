@@ -454,7 +454,6 @@ async def generate_resume_content_tool(args: Dict[str, Any]) -> Dict[str, Any]:
         "personality_traits": str,
         "job_title": str, 
         "company": str, 
-        "job_description": str,
         "portfolio_projects_json": str
     }
 )
@@ -476,8 +475,6 @@ async def generate_cover_letter_content_tool(args: Dict[str, Any]) -> Dict[str, 
             The job title.
         - company : str
             The company name.
-        - job_description : str
-            Full job description text.
         - portfolio_projects_json : str
             JSON string of portfolio projects from get_portfolio_projects.
     
@@ -515,7 +512,6 @@ async def generate_cover_letter_content_tool(args: Dict[str, Any]) -> Dict[str, 
             job_analysis,
             args['job_title'],
             args['company'],
-            args['job_description'],
             personality_traits,
             portfolio_projects
         )

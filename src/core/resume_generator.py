@@ -1726,94 +1726,94 @@ def convert_word_to_pdf(file_path: str) -> str:
 print("Document creation functions defined!")
 
 # %%
-# Orchestrating Function
-def create_resume(job_url: str, brightdata_api_key: str, resume_yaml_path: str = 'resume_ale.yaml') -> tuple[str, str, Dict[str, Any]]:
-    """
-    Orchestrate the complete resume and cover letter generation process.
+# # Orchestrating Function
+# def create_resume(job_url: str, brightdata_api_key: str, resume_yaml_path: str = 'resume_ale.yaml') -> tuple[str, str, Dict[str, Any]]:
+#     """
+#     Orchestrate the complete resume and cover letter generation process.
     
-    This function serves as the main entry point for generating tailored resumes
-    and cover letters from job postings. It extracts job information, analyzes
-    requirements, generates customized content using AI, and creates professional
-    documents.
+#     This function serves as the main entry point for generating tailored resumes
+#     and cover letters from job postings. It extracts job information, analyzes
+#     requirements, generates customized content using AI, and creates professional
+#     documents.
     
-    Parameters
-    ----------
-    job_url : str
-        URL of the job posting (LinkedIn or Indeed supported).
-    brightdata_api_key : str
-        BrightData API key for job extraction.
-    resume_yaml_path : str, optional
-        Path to the YAML file containing resume data. Default is 'resume_ale.yaml'.
+#     Parameters
+#     ----------
+#     job_url : str
+#         URL of the job posting (LinkedIn or Indeed supported).
+#     brightdata_api_key : str
+#         BrightData API key for job extraction.
+#     resume_yaml_path : str, optional
+#         Path to the YAML file containing resume data. Default is 'resume_ale.yaml'.
     
-    Returns
-    -------
-    tuple[str, str, Dict[str, Any]]
-        A tuple containing the paths to the generated Word document and PDF, and the job dictionary.
-        Format: (word_document_path, pdf_document_path, job_data_dict)
+#     Returns
+#     -------
+#     tuple[str, str, Dict[str, Any]]
+#         A tuple containing the paths to the generated Word document and PDF, and the job dictionary.
+#         Format: (word_document_path, pdf_document_path, job_data_dict)
     
-    Raises
-    ------
-    ValueError
-        If required environment variables are missing or job extraction fails.
-    FileNotFoundError
-        If the resume YAML file is not found.
-    Exception
-        For any other errors during the process.
+#     Raises
+#     ------
+#     ValueError
+#         If required environment variables are missing or job extraction fails.
+#     FileNotFoundError
+#         If the resume YAML file is not found.
+#     Exception
+#         For any other errors during the process.
     
-    Examples
-    --------
-    Generate documents for a LinkedIn job:
+#     Examples
+#     --------
+#     Generate documents for a LinkedIn job:
     
-    >>> doc_path, pdf_path = main("https://www.linkedin.com/jobs/view/12345")
-    >>> print(f"Generated: {doc_path}, {pdf_path}")
-    Generated: Data_Scientist_Company_2025_09_02.docx, Data_Scientist_Company_2025_09_02.pdf
+#     >>> doc_path, pdf_path = main("https://www.linkedin.com/jobs/view/12345")
+#     >>> print(f"Generated: {doc_path}, {pdf_path}")
+#     Generated: Data_Scientist_Company_2025_09_02.docx, Data_Scientist_Company_2025_09_02.pdf
     
-    Use a custom resume file:
+#     Use a custom resume file:
     
-    >>> doc_path, pdf_path = main("https://ca.indeed.com/viewjob?jk=67890", "my_resume.yaml")
-    """
-    try:
-        # Step 1: Extract job information
-        print("Extracting job information from URL")
-        job_dict, job_df = extract_job(job_url, brightdata_api_key)
-        job_title = job_dict.get('job_title', 'Unknown Title')
-        company = job_dict.get('company_name', 'Unknown Company')
-        job_description = job_dict.get('job_summary', '') or job_dict.get('description_text', 'No description available')
-        print(f"Extracted: {job_title} at {company}")
+#     >>> doc_path, pdf_path = main("https://ca.indeed.com/viewjob?jk=67890", "my_resume.yaml")
+#     """
+#     try:
+#         # Step 1: Extract job information
+#         print("Extracting job information from URL")
+#         job_dict, job_df = extract_job(job_url, brightdata_api_key)
+#         job_title = job_dict.get('job_title', 'Unknown Title')
+#         company = job_dict.get('company_name', 'Unknown Company')
+#         job_description = job_dict.get('description_text', 'No description text available')
+#         print(f"Extracted: {job_title} at {company}")
         
-        # Step 2: Load resume data
-        print("Loading resume data")
-        resume_data = load_resume_yaml(resume_yaml_path)
+#         # Step 2: Load resume data
+#         print("Loading resume data")
+#         resume_data = load_resume_yaml(resume_yaml_path)
         
-        # Step 3: Analyze job description
-        print("Analyzing job description")
-        prompt_analysis = create_analysis_prompt(job_title, company, job_description)
-        if not key:
-            raise ValueError("CLAUDE_API_KEY environment variable is required.")
-        job_analysis = claude_analysis(key, prompt_analysis)
+#         # Step 3: Analyze job description
+#         print("Analyzing job description")
+#         prompt_analysis = create_analysis_prompt(job_title, company, job_description)
+#         if not key:
+#             raise ValueError("CLAUDE_API_KEY environment variable is required.")
+#         job_analysis = claude_analysis(key, prompt_analysis)
         
-        # Step 4: Generate tailored resume
-        print("Generating tailored resume")
-        prompt_resume = create_resume_prompt(resume_data, job_analysis, job_title, company, job_description)
-        resume = claude_resume(key, prompt_resume)
+#         # Step 4: Generate tailored resume
+#         print("Generating tailored resume")
+#         prompt_resume = create_resume_prompt(resume_data, job_analysis, job_title, company, job_description)
+#         resume = claude_resume(key, prompt_resume)
         
-        # Step 5: Generate tailored cover letter
-        print("Generating tailored cover letter")
-        prompt_cover_letter = create_cover_letter_prompt(resume, job_analysis, job_title, company, job_description)
-        cover_letter = claude_cover_letter(key, prompt_cover_letter)
+#         # Step 5: Generate tailored cover letter
+#         print("Generating tailored cover letter")
+#         prompt_cover_letter = create_cover_letter_prompt(resume, job_analysis, job_title, company, job_description)
+#         cover_letter = claude_cover_letter(key, prompt_cover_letter)
         
-        # Step 6: Create and save documents
-        print("Creating and saving documents")
-        today = datetime.today().strftime('%Y_%m_%d_%H_%M')
-        doc = create_resume_coverletter(resume, resume_data, cover_letter, company)
-        doc_path = f'Alejandro_Leiva_{job_title}_{company}_{today}.docx'
-        doc.save(doc_path)
-        pdf_path = convert_word_to_pdf(doc_path)
+#         # Step 6: Create and save documents
+#         print("Creating and saving documents")
+#         today = datetime.today().strftime('%Y_%m_%d_%H_%M')
+#         doc = create_resume_coverletter(resume, resume_data, cover_letter, company)
+#         doc_path = f'Alejandro_Leiva_{job_title}_{company}_{today}.docx'
+#         doc.save(doc_path)
+#         pdf_path = convert_word_to_pdf(doc_path)
         
-        return doc_path, pdf_path, job_dict
+#         return doc_path, pdf_path, job_dict
         
-    except Exception as e:
-        print(f"❌ Error in main process: {e}")
-        raise
+#     except Exception as e:
+#         print(f"❌ Error in main process: {e}")
+#         raise
 
 
