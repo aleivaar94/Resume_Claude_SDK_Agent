@@ -47,3 +47,5 @@ If payload has: {"metadata": {"company": "CFIA"}}
 FieldCondition(key="metadata.company", match=MatchValue(value="CFIA"))
 
 Difference between using parameters in tools vs internalizing (encapsulating) within the tool itself.
+
+I set a goal to end by the end of the week, but I just wanted to keep adding features on top of the delays from learning new concepts and fixing bugs. The learning is to have just have an MVP and define 3 main features to focus. Set the timeline a realistic timeline based on that.
