@@ -55,15 +55,15 @@ You are an expert Resume AI Agent that generates tailored resumes and cover lett
    Note: Returns BOTH tailored content and original resume data (includes personal_information)
 
 5. **generate_cover_letter_content** - Generate tailored cover letter
-   Input: resume_generated_json (pass the entire output from generate_resume_content), job_analysis_json, job_title, company, job_description
-   Returns: opening_paragraph, body_paragraph, closing_paragraph
-   Note: Extract resume_generated.resume_generated if needed for the prompt
+   Input: resume_generated_json (pass the entire output from generate_resume_content), job_analysis_json, job_title, company, personality_traits, portfolio_projects_json
+   Returns: {"opening_paragraph": "...", "body_paragraph": "...", "closing_paragraph": "..."}
+   Note: Returns ONLY the cover letter paragraphs (flat structure, no nested data)
 
 6. **create_documents** - Create Word and PDF documents
-   Input: resume_generated_json (from generate_resume_content), cover_letter_generated_json, company, job_title, document_type
+   Input: resume_generated_json (from generate_resume_content), cover_letter_generated_json (from generate_cover_letter_content), portfolio_projects_json (from get_portfolio_projects), company, job_title, document_type
    document_type options: "both" (default), "resume_only", "cover_letter_only"
    Returns: file paths to generated documents
-   Note: resume_generated_json contains both generated and original data
+   Note: Pass cover_letter_generated_json and portfolio_projects_json as SEPARATE parameters
 
 7. **get_portfolio_projects** - Retrieve relevant portfolio projects
    Input: job_analysis_json (from analyze_job)
@@ -125,8 +125,13 @@ Next tool input: "{\"key\": \"value\"}"  ← Pass as STRING
 4. Copy JSON exactly as received
 
 **Example flow:**
-- Step 2: get_candidate_profile returns: `{"personal_information": {...}, "work_experience": [...]}`
-- Step 4: Pass to generate_resume_content as: `resume_data_json = "{\"personal_information\": {...}, \"work_experience\": [...]}"`
+- Step 2: analyze_job returns: `{"technical_skills": [...], "soft_skills": [...], "keywords": [...]}`
+- Step 4: get_portfolio_projects returns: `{"projects_for_prompt": [...], "projects_for_list": [...]}`
+- Step 6: generate_cover_letter_content returns: `{"opening_paragraph": "...", "body_paragraph": "...", "closing_paragraph": "..."}`
+- Step 7: create_documents receives THREE separate JSON inputs:
+  - resume_generated_json from generate_resume_content
+  - cover_letter_generated_json from generate_cover_letter_content
+  - portfolio_projects_json from get_portfolio_projects
 
 ## OUTPUT FORMATTING - CRITICAL
 
@@ -170,6 +175,7 @@ async def start():
     Notes
     -----
     Requires ANTHROPIC_API_KEY or CLAUDE_API_KEY in environment variables.
+    The client is NOT context-managed here to avoid task mismatch errors.
     """
     options = ClaudeAgentOptions(
         model="claude-haiku-4-5",
@@ -185,11 +191,29 @@ async def start():
             "mcp__resume_tools__create_documents"
         ]
     )
+    # Create client WITHOUT context manager to avoid task mismatch
     client = ClaudeSDKClient(options=options)
-    await client.__aenter__()
     cl.user_session.set("client", client)
+    cl.user_session.set("client_initialized", False)
+    cl.user_session.set("stop_requested", False)
+    cl.user_session.set("response_generator", None)
     
     await cl.Message(content="Hello! I'm your Resume AI Agent. Send me a LinkedIn or Indeed job URL to get started, or ask me to generate content in a specific format (e.g., 'only show the resume in markdown').").send()
+
+@cl.on_stop
+def on_stop():
+    """
+    Handle user stop button clicks.
+    
+    Sets a flag to indicate the user wants to stop the current operation,
+    allowing graceful shutdown of the async generator.
+    
+    Notes
+    -----
+    This is a synchronous function as required by Chainlit's @cl.on_stop.
+    """
+    cl.user_session.set("stop_requested", True)
+    print("User requested stop - flagging for graceful shutdown")
 
 @cl.on_chat_end
 async def end():
@@ -197,22 +221,35 @@ async def end():
     Clean up resources when the chat session ends.
     
     This function properly closes the Claude SDK client and releases
-    any associated resources.
+    any associated resources without causing task mismatch errors.
     
     Notes
     -----
-    Uses shield() to protect cleanup from task cancellation.
+    Silently ignores cleanup errors to prevent error messages during shutdown.
     """
+    # Close any pending response generator
+    response_gen = cl.user_session.get("response_generator")
+    if response_gen:
+        try:
+            await response_gen.aclose()
+        except Exception:
+            pass
+        cl.user_session.set("response_generator", None)
+    
     client = cl.user_session.get("client")
     if client:
         try:
-            # Shield the cleanup from cancellation
-            await asyncio.shield(client.__aexit__(None, None, None))
-        except asyncio.CancelledError:
-            # If still cancelled, force close without waiting
+            # Only cleanup if initialized
+            if cl.user_session.get("client_initialized"):
+                # Use close() method if available, otherwise just clear reference
+                if hasattr(client, 'close'):
+                    await client.close()
+        except Exception:
+            # Silently ignore cleanup errors - they don't affect functionality
             pass
-        except Exception as e:
-            print(f"Error during client cleanup: {e}")
+        finally:
+            cl.user_session.set("client", None)
+            cl.user_session.set("client_initialized", False)
 
 @cl.on_message
 async def main(message: cl.Message):
@@ -232,34 +269,79 @@ async def main(message: cl.Message):
     -----
     The function will automatically create download buttons for any .docx
     or .pdf files mentioned in the agent's response.
+    Uses proper context management per message to avoid task mismatch.
+    Properly handles GeneratorExit to prevent async generator cleanup errors.
     """
     client = cl.user_session.get("client")
+    
+    # Reset stop flag for new message
+    cl.user_session.set("stop_requested", False)
     
     msg = cl.Message(content="")
     await msg.send()
     
     full_response = ""
+    response_gen = None
 
     try:
+        # Initialize client with context manager ONLY for this message
+        if not cl.user_session.get("client_initialized"):
+            await client.__aenter__()
+            cl.user_session.set("client_initialized", True)
+        
         # Send the query
         await client.query(message.content)
         
-        # Iterate over responses
-        async for response in client.receive_response():
+        # Get the response generator and store it for potential cleanup
+        response_gen = client.receive_response()
+        cl.user_session.set("response_generator", response_gen)
+        
+        # Iterate over responses with proper exception handling
+        async for response in response_gen:
+            # Check if stop was requested
+            if cl.user_session.get("stop_requested"):
+                await msg.stream_token("\n\n⚠️ Stopped by user.")
+                break
+            
             if isinstance(response, AssistantMessage):
                 for block in response.content:
                     if isinstance(block, TextBlock):
                         text = block.text
                         await msg.stream_token(text)
                         full_response += text
+                        
+    except GeneratorExit:
+        # Handle generator cleanup gracefully - this is expected during shutdown
+        pass
     except asyncio.CancelledError:
-        # Handle graceful shutdown
-        await msg.stream_token("\n\n⚠️ Request was cancelled.")
+        # Handle task cancellation gracefully
+        try:
+            await msg.stream_token("\n\n⚠️ Request was cancelled.")
+        except Exception:
+            pass
         raise
     except Exception as e:
-        await msg.stream_token(f"\n\n❌ Error: {str(e)}")
+        try:
+            await msg.stream_token(f"\n\n❌ Error: {str(e)}")
+        except Exception:
+            pass
     finally:
-        await msg.update()
+        # Clear the stored generator reference
+        cl.user_session.set("response_generator", None)
+        
+        # Properly close the async generator if it exists
+        if response_gen is not None:
+            try:
+                await response_gen.aclose()
+            except Exception:
+                # Ignore errors during generator cleanup
+                pass
+        
+        # Update the message
+        try:
+            await msg.update()
+        except Exception:
+            pass
 
     # Check for file paths in the response to create download buttons
     elements = []
