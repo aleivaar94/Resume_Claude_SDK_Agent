@@ -199,7 +199,7 @@ def extract_job_info_linkedin(json_output):
         'company_name': job.get('company_name'),
         'company_id': job.get('company_id'),
         'job_location': job.get('job_location'),
-        'job_summary': job.get('job_summary'),
+        'job_description': job.get('job_summary'),
         'company_url': job.get('company_url'),
         'job_posted_date': job.get('job_posted_date'),
         # Extract job poster details as separate fields
@@ -248,7 +248,7 @@ def extract_job_info_indeed(json_output):
         'company_name': job.get('company_name'),
         'date_posted_parsed': job.get('date_posted_parsed'),
         'job_title': job.get('job_title'),
-        'description_text': job.get('description_text'),
+        'job_description': job.get('description_text'),
         'company_link': job.get('company_link'),
     }
 
