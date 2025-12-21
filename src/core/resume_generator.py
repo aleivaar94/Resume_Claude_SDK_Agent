@@ -719,7 +719,8 @@ def retrieve_portfolio_projects_hierarchical(
         if result:
             projects_for_list.append({
                 "title": result["metadata"]["project_title"],
-                "url": result["metadata"]["project_url"]
+                "url": result["metadata"]["project_url"],
+                "tech_stack": result["metadata"].get("tech_stack", [])
             })
     
     print(f"\n📊 Retrieval Summary:")
@@ -1562,13 +1563,22 @@ def _add_cover_letter_section(doc: Document, cover_letter: Dict[str, Any], resum
     if portfolio_projects and portfolio_projects.get('projects_for_list') and len(portfolio_projects['projects_for_list']) > 0:
         projects_header = doc.add_paragraph()
         projects_header.alignment = WD_ALIGN_PARAGRAPH.LEFT
-        projects_header.add_run("Here is a list of relevant portfolio projects:").bold = True
+        projects_header.add_run("Here is a list of relevant portfolio projects:")
         projects_header.paragraph_format.space_after = Pt(6)
         
         for project in portfolio_projects['projects_for_list']:
+            # Project title and URL
             project_item = doc.add_paragraph()
             project_item.alignment = WD_ALIGN_PARAGRAPH.LEFT
             project_item.add_run(f"- {project['title']}: {project['url']}")
+            project_item.paragraph_format.space_after = Pt(2)
+            project_item.paragraph_format.left_indent = Inches(0.25)
+            # Add tech stack
+            tech_stack_text = ", ".join(project['tech_stack'])
+            project_item = doc.add_paragraph()
+            project_item.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            tech_run = project_item.add_run(f"  Tech Stack: {tech_stack_text}")
+            tech_run.font.italic = True
             project_item.paragraph_format.space_after = Pt(6)
             project_item.paragraph_format.left_indent = Inches(0.25)
 
