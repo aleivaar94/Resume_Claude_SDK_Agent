@@ -140,23 +140,9 @@ Next tool input: "{\"key\": \"value\"}"  ← Pass as STRING
 ## OUTPUT FORMATTING - CRITICAL
 
 **After successfully calling create_documents:**
-1. State ONLY: "✅ I've successfully created your complete application package for the [job_title] position at [company]!"
-2. STOP immediately
-3. Do NOT add:
-   - Document details or file paths (already shown by Chainlit)
-   - "What's Included" sections
-   - "Next Steps" recommendations
-   - Any additional commentary
+1. State: "✅ I've successfully created your complete application package for the [job_title] position at [company]!"
+2. Do NOT add anything else
 
-**The file download buttons will appear automatically in the UI.**
-
-**Example correct response:**
-"✅ I've successfully created your complete application package for the Data Analyst position at Chord!"
-[END - No additional output]
-
-**For other document types:**
-- resume_only: "✅ I've successfully created your resume for the [job_title] position at [company]!"
-- cover_letter_only: "✅ I've successfully created your cover letter for the [job_title] position at [company]!"
 
 ## ADAPTABILITY
 
@@ -202,7 +188,7 @@ async def start():
     cl.user_session.set("stop_requested", False)
     cl.user_session.set("response_generator", None)
     
-    await cl.Message(content="Hello! I'm your Resume AI Agent. Send me a LinkedIn or Indeed job URL to get started, or ask me to generate content in a specific format (e.g., 'only show the resume in markdown').").send()
+    await cl.Message(content="Hello! I'm your Resume AI Agent. Send me a LinkedIn or Indeed job URL or a snapshot ID. Make sure to specify the platform (e.g., LinkedIn, Indeed) if you send a snapshot ID.").send()
 
 @cl.on_stop
 def on_stop():
@@ -350,21 +336,46 @@ async def main(message: cl.Message):
     # Check for file paths in the response to create download buttons
     elements = []
     
-    # Find .docx paths
-    docx_matches = re.findall(r'(?:[a-zA-Z]:\\[\w\-. \\]+\.docx|output[/\\][\w\-. ]+\.docx)', full_response)
-    for path in docx_matches:
-        clean_path = path.strip().replace('\\\\', '\\')
-        if os.path.exists(clean_path):
-            if not any(e.path == clean_path for e in elements):
-                elements.append(cl.File(path=clean_path, name=os.path.basename(clean_path), display="inline"))
+    # Look for the DOWNLOAD_FILES: line with word_path and pdf_path
+    download_pattern = r'DOWNLOAD_FILES:\s*word_path="([^"]+)"\s*pdf_path="([^"]+)"'
+    match = re.search(download_pattern, full_response)
+    
+    if match:
+        word_path = match.group(1)
+        pdf_path = match.group(2)
+        
+        # Add Word file if it exists
+        if os.path.exists(word_path):
+            elements.append(cl.File(
+                path=word_path,
+                name=os.path.basename(word_path),
+                display="inline"
+            ))
+        
+        # Add PDF file if it exists
+        if os.path.exists(pdf_path):
+            elements.append(cl.File(
+                path=pdf_path,
+                name=os.path.basename(pdf_path),
+                display="inline"
+            ))
+    else:
+        # Fallback: Find file paths using regex if DOWNLOAD_FILES format not found
+        # Find .docx paths
+        docx_matches = re.findall(r'(?:[a-zA-Z]:\\[\w\-. \\]+\.docx|output[/\\][\w\-. ]+\.docx)', full_response)
+        for path in docx_matches:
+            clean_path = path.strip().replace('\\\\', '\\')
+            if os.path.exists(clean_path):
+                if not any(e.path == clean_path for e in elements):
+                    elements.append(cl.File(path=clean_path, name=os.path.basename(clean_path), display="inline"))
 
-    # Find .pdf paths
-    pdf_matches = re.findall(r'(?:[a-zA-Z]:\\[\w\-. \\]+\.pdf|output[/\\][\w\-. ]+\.pdf)', full_response)
-    for path in pdf_matches:
-        clean_path = path.strip().replace('\\\\', '\\')
-        if os.path.exists(clean_path):
-            if not any(e.path == clean_path for e in elements):
-                elements.append(cl.File(path=clean_path, name=os.path.basename(clean_path), display="inline"))
+        # Find .pdf paths
+        pdf_matches = re.findall(r'(?:[a-zA-Z]:\\[\w\-. \\]+\.pdf|output[/\\][\w\-. ]+\.pdf)', full_response)
+        for path in pdf_matches:
+            clean_path = path.strip().replace('\\\\', '\\')
+            if os.path.exists(clean_path):
+                if not any(e.path == clean_path for e in elements):
+                    elements.append(cl.File(path=clean_path, name=os.path.basename(clean_path), display="inline"))
             
     if elements:
-        await cl.Message(content="Here are your generated documents:", elements=elements).send()
+        await cl.Message(content="📥 **Download your documents:**", elements=elements).send()
