@@ -535,6 +535,7 @@ def main():
     --------
     $ python scripts/create_embeddings.py --file data/resume_ale.md --type markdown
     $ python scripts/create_embeddings.py --file data/personalities_16.md --type markdown --collection personality
+    $ python scripts/create_embeddings.py --delete_collection personality
     $ python scripts/create_embeddings.py --reset
     """
     parser = argparse.ArgumentParser(description="Create embeddings from markdown files")
@@ -543,18 +544,36 @@ def main():
                         help='File type (only markdown supported)')
     parser.add_argument('--collection', type=str, 
                         help='Target collection name (auto-detected if not specified: resume files -> "resume_data", personality files -> "personality")')
+    parser.add_argument('--delete_collection', type=str, 
+                        choices=['resume_data', 'personality', 'projects'],
+                        help='Delete a specific collection (resume_data, personality, or projects)')
     parser.add_argument('--reset', action='store_true', 
                         help='Reset and rebuild entire vector database (deletes storage folder)')
     
     args = parser.parse_args()
     
+    # Check for mutually exclusive flags
+    if args.reset and args.delete_collection:
+        print("❌ Error: Cannot use --reset and --delete_collection together")
+        print("   Use --reset to delete entire database, OR --delete_collection to delete specific collection")
+        return
+    
     # Initialize embeddings
     print("🔧 Initializing OpenAI embeddings...")
     embedder = OpenAIEmbeddings()
     
+    # Delete specific collection if requested
+    if args.delete_collection:
+        print(f"🗑️  Deleting collection: {args.delete_collection}")
+        store = QdrantVectorStore(collection_name=args.delete_collection)
+        store.delete_collection()
+        print(f"   ✅ Collection '{args.delete_collection}' deleted successfully")
+        print(f"   💡 You can now recreate it using: python scripts/create_embeddings.py --file <file_path> --type markdown")
+        return
+    
     # Reset database if requested
     if args.reset:
-        print("🗑️  Resetting vector database (deleting both collections)...")
+        print("🗑️  Resetting vector database (deleting all collections)...")
         # Create a single store instance to reset the entire database
         # This avoids file locking issues with multiple client instances
         store = QdrantVectorStore(collection_name="resume_data")

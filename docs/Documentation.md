@@ -184,12 +184,54 @@ python scripts/create_embeddings.py
 
 #### Resetting and Rebuilding the Vector Database
 
-**Complete Reset (Both Collections)**
+**Selective Collection Deletion (Single Collection)**
+
+When you need to delete and rebuild ONLY ONE collection (recommended for targeted updates):
+
+```bash
+# Delete only the personality collection
+python scripts/create_embeddings.py --delete_collection personality
+
+# Resume and projects collections remain intact
+python scripts/create_embeddings.py
+# Output shows:
+#   resume_data: 35 documents    ✓ Still present
+#   personality: 0 documents     ← Deleted
+#   projects: 6 documents        ✓ Still present
+
+# Rebuild only the personality collection
+python scripts/create_embeddings.py --file data/personalities_16.md --type markdown
+
+# Verify rebuild complete
+python scripts/create_embeddings.py
+# Output shows:
+#   resume_data: 35 documents
+#   personality: 14 documents    ← Restored
+#   projects: 6 documents
+```
+
+**Valid collections for `--delete_collection`:**
+- `resume_data` - Resume content collection
+- `personality` - Personality traits collection
+- `projects` - Portfolio projects collection
+
+**Example: Delete and rebuild resume data collection after updating your resume:**
+```bash
+# Delete old resume embeddings
+python scripts/create_embeddings.py --delete_collection resume_data
+
+# Recreate with new data
+python scripts/create_embeddings.py --file data/resume_ale.md --type markdown
+```
+
+---
+
+**Complete Reset (All Collections)**
 
 When you need to reset BOTH collections (recommended for major changes):
 
 ```bash
-# Step 1: Reset the vector database (deletes both collections)
+# Step 1: Reset the vector database (deletes all collections)
 python scripts/create_embeddings.py --reset
 
 # Step 2: Rebuild resume_data collection
@@ -198,7 +240,10 @@ python scripts/create_embeddings.py --file data/resume_ale.md --type markdown
 # Step 3: Rebuild personality collection
 python scripts/create_embeddings.py --file data/personalities_16.md --type markdown
 
-# Step 4: Verify the rebuild
+# Step 4: Rebuild projects collection
+python scripts/create_embeddings.py --file data/portfolio_projects.md --type markdown
+
+# Step 5: Verify the rebuild
 python scripts/create_embeddings.py
 ```
 
@@ -207,6 +252,7 @@ python scripts/create_embeddings.py
 📊 Current database state:
    resume_data: 35 documents
    personality: 14 documents
+   projects: 6 documents
 ```
 
 #### When to Reset the Vector Database
