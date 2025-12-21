@@ -258,23 +258,32 @@ def extract_job_info_indeed(json_output):
     return result, result_df
 
 # %%
-def extract_job(job_url: str, api_key: str, max_retries: int = 360, wait_time: int = 5) -> tuple[dict, pd.DataFrame]:
+def extract_job(
+    job_url_or_snapshot_id: str, 
+    api_key: str, 
+    platform: Optional[Literal["linkedin", "indeed"]] = None,
+    max_retries: int = 360, 
+    wait_time: int = 5
+) -> tuple[dict, pd.DataFrame]:
     """
     Orchestrates the full job scraping process for LinkedIn or Indeed using Bright Data API.
     
     This function automatically detects the job platform (LinkedIn or Indeed) from the URL
-    and orchestrates the snapshot triggering, output retrieval, and data extraction.
+    or retrieves data from an existing snapshot ID. When using a snapshot ID, the platform
+    parameter must be specified.
     
     Parameters
     ----------
-    job_url : str
-        The URL of the job posting.
+    job_url_or_snapshot_id : str
+        The URL of the job posting OR a BrightData snapshot ID (starting with 's_').
     api_key : str
         Bright Data API key.
+    platform : Optional[Literal["linkedin", "indeed"]], optional
+        Platform identifier. Required when using snapshot ID, optional for URLs (auto-detected).
     max_retries : int, optional
-        Maximum retries for snapshot polling (default: 10).
+        Maximum retries for snapshot polling (default: 360).
     wait_time : int, optional
-        Wait time in seconds between retries (default: 3).
+        Wait time in seconds between retries (default: 5).
     
     Returns
     -------
@@ -284,26 +293,62 @@ def extract_job(job_url: str, api_key: str, max_retries: int = 360, wait_time: i
     Raises
     ------
     ValueError
-        If the platform cannot be detected or is unsupported.
-    """
-    # Detect platform from URL
-    parsed_url = urlparse(job_url.lower())
-    domain = parsed_url.netloc
+        If the platform cannot be detected, is unsupported, or is missing when using snapshot ID.
     
-    if 'linkedin.com' in domain:
-        platform = 'linkedin'
-    elif 'indeed.com' in domain:
-        platform = 'indeed'
+    Examples
+    --------
+    Extract from URL (auto-detect platform):
+    >>> job_dict, job_df = extract_job("https://www.linkedin.com/jobs/view/12345", api_key)
+    
+    Extract from snapshot ID (must specify platform):
+    >>> job_dict, job_df = extract_job("s_mjepdfj94zb4miakd", api_key, platform="linkedin")
+    """
+    # Detect if input is snapshot ID or URL
+    is_snapshot_id = job_url_or_snapshot_id.startswith("s_")
+    
+    if is_snapshot_id:
+        # Snapshot ID flow - platform must be specified
+        if not platform:
+            raise ValueError(
+                "Platform parameter is required when using snapshot ID. "
+                "Specify platform='linkedin' or platform='indeed'."
+            )
+        snapshot_id = job_url_or_snapshot_id
+        print(f"Using existing snapshot ID: {snapshot_id} for platform: {platform}")
     else:
-        raise ValueError(f"Unsupported platform. Only LinkedIn and Indeed are supported. Detected domain: {domain}")
+        # URL flow - detect platform from URL if not provided
+        if not platform:
+            parsed_url = urlparse(job_url_or_snapshot_id.lower())
+            domain = parsed_url.netloc
+            
+            if 'linkedin.com' in domain:
+                platform = 'linkedin'
+            elif 'indeed.com' in domain:
+                platform = 'indeed'
+            else:
+                raise ValueError(
+                    f"Unsupported platform. Only LinkedIn and Indeed are supported. "
+                    f"Detected domain: {domain}"
+                )
+        
+        # Trigger snapshot creation
+        if platform == "linkedin":
+            snapshot_id = get_brightdata_snapshot_linkedin(job_url_or_snapshot_id, api_key)
+        elif platform == "indeed":
+            snapshot_id = get_brightdata_snapshot_indeed(job_url_or_snapshot_id, api_key)
+        else:
+            raise ValueError(
+                f"Invalid platform: {platform}. Use 'linkedin' or 'indeed'."
+            )
+    
+    # Common flow: retrieve snapshot output and extract job info
+    output = get_snapshot_output(snapshot_id, api_key, max_retries, wait_time)
     
     if platform == "linkedin":
-        snapshot_id = get_brightdata_snapshot_linkedin(job_url, api_key)
-        output = get_snapshot_output(snapshot_id, api_key, max_retries, wait_time)
         return extract_job_info_linkedin(output)
     elif platform == "indeed":
-        snapshot_id = get_brightdata_snapshot_indeed(job_url, api_key)
-        output = get_snapshot_output(snapshot_id, api_key, max_retries, wait_time)
         return extract_job_info_indeed(output)
+    else:
+        raise ValueError(f"Invalid platform: {platform}. Use 'linkedin' or 'indeed'.")
 
 

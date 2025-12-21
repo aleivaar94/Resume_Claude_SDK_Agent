@@ -62,19 +62,21 @@ def get_claude_key():
 
 @tool(
     "scrape_job", 
-    "Extract job information from a LinkedIn or Indeed URL. Returns job_title, company_name, job_summary/description_text, and other metadata.", 
-    {"url": str}
+    "Extract job information from a LinkedIn or Indeed URL, or retrieve data from an existing BrightData snapshot ID. When using snapshot ID (starts with 's_'), you must specify the platform ('linkedin' or 'indeed'). Returns job_title, company_name, job_summary/description_text, and other metadata.", 
+    {"url": str, "platform": str}
 )
 async def scrape_job_tool(args: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Scrapes job details from LinkedIn or Indeed URLs using BrightData API.
+    Scrapes job details from LinkedIn or Indeed URLs, or retrieves data from existing snapshot IDs using BrightData API.
     
     Parameters
     ----------
     args : Dict[str, Any]
         Dictionary containing:
         - url : str
-            The job posting URL (LinkedIn or Indeed).
+            The job posting URL (LinkedIn or Indeed) OR a BrightData snapshot ID (starts with 's_').
+        - platform : str, optional
+            Platform identifier ('linkedin' or 'indeed'). Required when using snapshot ID.
     
     Returns
     -------
@@ -83,8 +85,11 @@ async def scrape_job_tool(args: Dict[str, Any]) -> Dict[str, Any]:
     
     Examples
     --------
-    Input:
+    Extract from URL:
     {"url": "https://www.linkedin.com/jobs/view/123456"}
+    
+    Extract from snapshot ID:
+    {"url": "s_mjepdfj94zb4miakd", "platform": "linkedin"}
     
     Output:
     {
@@ -95,12 +100,19 @@ async def scrape_job_tool(args: Dict[str, Any]) -> Dict[str, Any]:
     }
     """
     url = args["url"]
+    platform = args.get("platform")  # Optional - only required for snapshot IDs
     api_key = get_brightdata_key()
     
     try:
-        print(f"[scrape_job_tool] Extracting job from: {url}")
-        # Here the "_" is the a pandas dataframe of the job data (not used)
-        job_dict, _ = extract_job(url, api_key)
+        is_snapshot_id = url.startswith("s_")
+        if is_snapshot_id:
+            print(f"[scrape_job_tool] Retrieving job from snapshot ID: {url} (platform: {platform})")
+        else:
+            print(f"[scrape_job_tool] Extracting job from URL: {url}")
+        
+        # Pass platform parameter to extract_job (None for URLs, required for snapshot IDs)
+        job_dict, _ = extract_job(url, api_key, platform=platform)
+        
         print(f"[scrape_job_tool] Success: {job_dict.get('job_title', 'N/A')} at {job_dict.get('company_name', 'N/A')}")
         return {
             "content": [
