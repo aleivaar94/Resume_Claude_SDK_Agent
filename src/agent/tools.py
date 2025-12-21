@@ -293,7 +293,9 @@ async def get_portfolio_projects_tool(args: Dict[str, Any]) -> Dict[str, Any]:
 @tool(
     "analyze_job", 
     "Analyze job description using Claude to extract technical_skills, soft_skills, and keywords. Pass the job info as strings.", 
-    {"job_title": str, "company": str, "job_description": str}
+    {"job_title": str, 
+     "company": str, 
+     "job_description": str}
 )
 async def analyze_job_tool(args: Dict[str, Any]) -> Dict[str, Any]:
     """
