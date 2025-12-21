@@ -1577,8 +1577,7 @@ def _add_cover_letter_section(doc: Document, cover_letter: Dict[str, Any], resum
             tech_stack_text = ", ".join(project['tech_stack'])
             project_item = doc.add_paragraph()
             project_item.alignment = WD_ALIGN_PARAGRAPH.LEFT
-            tech_run = project_item.add_run(f"  Tech Stack: {tech_stack_text}")
-            tech_run.font.italic = True
+            tech_run = project_item.add_run(f"Tech Stack: {tech_stack_text}")
             project_item.paragraph_format.space_after = Pt(6)
             project_item.paragraph_format.left_indent = Inches(0.25)
 
