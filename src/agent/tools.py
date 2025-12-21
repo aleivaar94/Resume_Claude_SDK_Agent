@@ -653,8 +653,6 @@ async def create_documents_tool(args: Dict[str, Any]) -> Dict[str, Any]:
             missing_keys = [key for key in required_keys if key not in cover_letter_generated]
             if missing_keys:
                 raise KeyError(f"Cover letter missing required keys: {missing_keys}. Got keys: {list(cover_letter_generated.keys())}")
-            
-            print(f"[create_documents_tool] Cover letter keys: {list(cover_letter_generated.keys())}")
         
         company = args['company']
         job_title = args['job_title']
