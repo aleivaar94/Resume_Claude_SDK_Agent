@@ -262,7 +262,7 @@ python scripts/create_embeddings.py
 - **Source data is updated** (e.g., adding new work experience, skills, personality traits)
 - **Metadata structure changes** (e.g., adding new fields to chunks)
 - **Corrupted or incorrect embeddings** are stored
-- **Switching from single to dual-collection architecture** (this update)
+- **Switching collection architecture** (e.g., adding new collections)
 
 **What Happens During Reset:**
 1. Deletes BOTH `resume_data` and `personality` collections from Qdrant
@@ -416,12 +416,13 @@ for result in results:
 
 ### Collection Architecture
 
-The system uses a **dual-collection architecture** for semantic separation:
+The system uses a **tri-collection architecture** for semantic separation and specialized retrieval:
 
 | Collection | Contents | Use Case | Storage Structure |
 |------------|----------|----------|-------------------|
 | `resume_data` | Resume information from resume_ale.md | Job-specific resume tailoring | Header-based chunks with rich metadata (section_type: work_experience, education, skills, continuing_studies, personal_info, professional_summary) |
 | `personality` | Personality traits from personalities_16.md | Cover letter personalization | Fixed-size chunks (400 chars, 100 char overlap) with no section_type, simplified metadata |
+| `projects` | Portfolio projects from portfolio_projects.md | Project-relevant content retrieval via two-step hierarchical search | Dual-chunked structure with `project_technical` (tech stack summary) and `project_full` (complete project details) sections, rich metadata (project_title, project_url, project_id, tech_stack) |
 
 **Personality Collection Simplification:**
 The personality collection uses simplified fixed-size chunking:
@@ -430,10 +431,19 @@ The personality collection uses simplified fixed-size chunking:
 - No `traits_included` metadata
 - Metadata includes only: `chunk_index`, `char_start`, `char_end`, `overlap_chars`
 
+**Projects Collection Two-Step Chunking:**
+The projects collection uses a specialized dual-chunk structure for hierarchical retrieval:
+- Each project is stored as two separate chunks: `project_technical` and `project_full`
+- `project_technical`: Short technical summary (tech stack + technical highlights) for fast, precise skill matching
+- `project_full`: Complete project details (purpose, tech stack, highlights, results) for narrative generation
+- Rich metadata allows filtering by `project_id` to correlate technical matches with full content
+- Enables efficient two-step retrieval: identify relevant projects via technical filters, then fetch full details
+
 **Benefits:**
-- **Semantic separation**: Resume facts vs personality traits stored separately
-- **Cleaner queries**: No need to filter by section_type when searching personality
-- **Performance**: Smaller collections = faster semantic search
+- **Semantic separation**: Resume facts, personality traits, and portfolio projects stored independently
+- **Specialized retrieval**: Projects use two-step hierarchical search for precision and context richness
+- **Cleaner queries**: No need to filter by section_type when searching personality; projects have dedicated retrieval logic
+- **Performance**: Smaller, focused collections = faster semantic search; two-step project retrieval reduces unnecessary full-content fetches
 - **Flexibility**: Can tune retrieval parameters independently per collection
 
 ## Portfolio Project Retrieval
