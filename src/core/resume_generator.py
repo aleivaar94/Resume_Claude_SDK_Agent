@@ -723,10 +723,6 @@ def retrieve_portfolio_projects_hierarchical(
                 "tech_stack": result["metadata"].get("tech_stack", [])
             })
     
-    print(f"\n📊 Retrieval Summary:")
-    print(f"   Projects for prompt (full content): {len(projects_for_prompt)}")
-    print(f"   Projects for list (title + URL): {len(projects_for_list)}")
-    
     return {
         "projects_for_prompt": projects_for_prompt,
         "projects_for_list": projects_for_list
@@ -1069,11 +1065,12 @@ def create_cover_letter_prompt(resume_data: Dict[str, Any], job_analysis: Dict[s
             ])
     
     prompt_cover_letter = f"""
-    You are an expert cover letter writer specializing in achievement-based writing and keyword optimization. 
+    You are an expert cover letter writer in the data analytics, data science, and AI engineering fields.
+    Your task is to create a tailored cover letter that accurately reflects the candidate's qualifications and aligns with the job requirements. Output the cover letter in the specified JSON format only. 
 
     Here is a summary of the job posting:
     <job_summary>
-    {job_analysis.get('job_summary', '')}
+    {job_analysis.get('job_summary', 'No job summary provided.')}
     </job_summary>
 
     Here is the candidate's resume data:
@@ -1111,29 +1108,19 @@ def create_cover_letter_prompt(resume_data: Dict[str, Any], job_analysis: Dict[s
     {json.dumps(job_analysis['keywords'])}
     </keywords>
 
-    Think through your analysis internally (do not output this thinking):
-    - Identify top 5 most important job requirements from the job summary
-    - Match soft skills to job needs and rank by importance
-    - List relevant achievements from resume matching job responsibilities
-    - Create skills-requirements matrix rating matches 1-5
-    - Identify 3-5 current industry challenges the candidate can address
-    - Review work experience timeline for accuracy
-    - Find compelling career narrative or growth story
-    - Brainstorm attention-grabbing opening hooks
-
-    Now craft a cover letter following these guidelines:
-
-    1. Structure: 3 short paragraphs (opening, body, closing) + projects list, under 250 words total
-    2. Tone: Casual but professional, avoid formal language or clichés
-    3. Tense: Present tense (except for past experiences)
-    4. Language: Avoid "expert", "skilled", "seasoned", "excited"
-    5. Opening: Attention-grabbing hook that references the job summary
-    6. Body: Highlight soft skills matching job requirements, naturally weave in relevant personality traits and reference 1-2 portfolio projects to demonstrate fit
-    7. Closing: Explain how skills solve industry challenges mentioned in the job summary
-    8. Keywords: Naturally incorporate throughout
-    9. Personality: Use provided personality traits to strengthen the narrative and show cultural/role fit
-    10. Relevance: Only use information from resume matching job requirements
-    11. Timeline: Accurately represent work experience dates
+    Structure the cover letter in 3 short paragraphs (opening, body, closing), under 250 words total:
+        - Opening: Demonstrate why you are interested in the role and company and how your skills solve industry challenges or specific problems mentioned in the job summary.
+        - Body: Highlight soft skills matching job requirements, naturally include in relevant personality traits and reference 1-2 portfolio projects to demonstrate skill.
+        - Closing: Reiterate enthusiasm for the role, summarize key qualifications, and include a call to action for next steps.
+    
+    Use a casual friendly tone, avoiding formal language or clichés.
+    Use present tense (except for past experiences).
+    Avoid words like "expert", "skilled", "seasoned", "excited".
+    Focus on highlighting soft skills that match the job requirements, weaving in relevant personality traits and referencing 1-2 portfolio projects to demonstrate fit.
+    Use keywords naturally throughout.
+    Use the provided personality traits to strengthen the narrative and show cultural/role fit.
+    Only use information from the resume that matches the job requirements.
+ 
 
     CRITICAL: Output ONLY a valid JSON object with this exact structure. No text before or after:
 
@@ -1143,7 +1130,6 @@ def create_cover_letter_prompt(resume_data: Dict[str, Any], job_analysis: Dict[s
         "closing_paragraph": "string (single paragraph)"
     }}
 
-    Do not include analysis tags, explanations, or any other text. Output pure JSON only.
     """
     return prompt_cover_letter
 
