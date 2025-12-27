@@ -61,7 +61,7 @@ class QdrantVectorStore:
     >>> store.add_documents(chunks, embeddings)
     """
     
-    def __init__(self, storage_path: str = "./vector_db/qdrant_storage", collection_name: str = "resume_data"):
+    def __init__(self, storage_path: str = "./vector_db/qdrant_storage", collection_name: str = "resume_data", auto_create: bool = True):
         """
         Initialize Qdrant vector store with local persistent storage.
         
@@ -72,11 +72,14 @@ class QdrantVectorStore:
         collection_name : str, optional
             Name of the collection to use (default: "resume_data").
             Use "personality" for personality traits collection.
+        auto_create : bool, optional
+            If True, automatically creates the collection if it doesn't exist (default: True).
+            Set to False when deleting collections to avoid recreation.
         
         Notes
         -----
         Creates storage directory if it doesn't exist.
-        Automatically creates collection if it doesn't exist.
+        Automatically creates collection if it doesn't exist (when auto_create=True).
         """
         # Create storage directory
         Path(storage_path).mkdir(parents=True, exist_ok=True)
@@ -89,8 +92,9 @@ class QdrantVectorStore:
         self.collection_name = collection_name
         self.vector_size = 1536  # text-embedding-3-small dimension
         
-        # Create collection if it doesn't exist
-        self._create_collection_if_not_exists()
+        # Create collection if it doesn't exist (and auto_create is True)
+        if auto_create:
+            self._create_collection_if_not_exists()
     
     def _create_collection_if_not_exists(self) -> None:
         """
@@ -332,55 +336,54 @@ class QdrantVectorStore:
     
     def delete_collection(self) -> None:
         """
-        Delete the collection (useful for resetting/rebuilding).
+        Delete the collection and its data permanently.
         
         Notes
         -----
         This permanently deletes all documents in the collection.
-        Reinitializes the client to clear stale cached data.
+        Also removes the collection folder from disk to ensure data is fully cleared.
+        The collection is NOT recreated after deletion.
+        
+        Examples
+        --------
+        >>> store = QdrantVectorStore(collection_name="projects")
+        >>> store.delete_collection()
+        🗑️  Deleted collection 'projects'
+        🗑️  Removed collection folder from disk
+        ✅ Collection 'projects' fully deleted
         """
         # Check if collection exists first
         if not self.client.collection_exists(self.collection_name):
             print(f"ℹ️  Collection '{self.collection_name}' does not exist")
             return
         
-        # Delete the collection
+        # Delete the collection via Qdrant API
         self.client.delete_collection(collection_name=self.collection_name)
         print(f"🗑️  Deleted collection '{self.collection_name}'")
         
-        # CRITICAL: Reinitialize client to clear stale cached data
-        # QdrantClient caches collection metadata - reusing same instance
-        # after delete_collection() returns stale data from the old collection
+        # Close client to release file locks
+        self.client.close()
         del self.client
+        
         import gc
         gc.collect()
-        time.sleep(1.5)  # Wait for disk I/O and garbage collection
+        time.sleep(0.5)  # Brief wait for file handles to release
         
-        # Create new client instance with clean cache
+        # Physically delete collection folder to ensure data is fully removed
+        collection_folder = Path(self.storage_path) / "collection" / self.collection_name
+        if collection_folder.exists():
+            import shutil
+            shutil.rmtree(collection_folder)
+            print(f"🗑️  Removed collection folder from disk: {collection_folder}")
+        
+        # Reinitialize client (without recreating the collection)
         self.client = QdrantClient(path=self.storage_path)
-        print(f"🔄 Reinitialized client (cleared cache)")
         
-        # Recreate empty collection
-        self._create_collection_if_not_exists()
-        
-        # Verify deletion completed successfully
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                final_count = self.count_documents()
-                if final_count == 0:
-                    print(f"✅ Verified collection is empty ({final_count} documents)")
-                    break
-                else:
-                    print(f"⚠️  Warning: {final_count} documents still exist after deletion attempt {attempt + 1}/{max_retries}")
-                    if attempt < max_retries - 1:
-                        time.sleep(2)  # Wait longer
-            except Exception as e:
-                print(f"⚠️  Could not verify count (attempt {attempt + 1}): {e}")
-                if attempt < max_retries - 1:
-                    time.sleep(1)
+        # Verify collection no longer exists
+        if not self.client.collection_exists(self.collection_name):
+            print(f"✅ Collection '{self.collection_name}' fully deleted")
         else:
-            print(f"❌ Failed to fully clear collection after {max_retries} attempts. Use reset_database() method instead.")
+            print(f"⚠️  Warning: Collection may still exist in metadata")
     
     def count_documents(self) -> int:
         """

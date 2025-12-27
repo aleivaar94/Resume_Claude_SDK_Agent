@@ -6,8 +6,8 @@ generates OpenAI embeddings, and stores them in a local Qdrant database for RAG 
 
 Usage
 -----
-python scripts/create_embeddings.py --file data/resume_ale.md --type markdown
-python scripts/create_embeddings.py --file data/personalities_16.md --type markdown
+python scripts/create_embeddings.py --file data/resume_ale.md
+python scripts/create_embeddings.py --file data/personalities_16.md
 python scripts/create_embeddings.py --reset  # Reset and rebuild entire database
 """
 
@@ -533,15 +533,13 @@ def main():
     
     Examples
     --------
-    $ python scripts/create_embeddings.py --file data/resume_ale.md --type markdown
-    $ python scripts/create_embeddings.py --file data/personalities_16.md --type markdown --collection personality
+    $ python scripts/create_embeddings.py --file data/resume_ale.md
+    $ python scripts/create_embeddings.py --file data/personalities_16.md --collection personality
     $ python scripts/create_embeddings.py --delete_collection personality
     $ python scripts/create_embeddings.py --reset
     """
     parser = argparse.ArgumentParser(description="Create embeddings from markdown files")
     parser.add_argument('--file', type=str, help='Path to markdown file')
-    parser.add_argument('--type', type=str, default='markdown', choices=['markdown'], 
-                        help='File type (only markdown supported)')
     parser.add_argument('--collection', type=str, 
                         help='Target collection name (auto-detected if not specified: resume files -> "resume_data", personality files -> "personality")')
     parser.add_argument('--delete_collection', type=str, 
@@ -565,10 +563,9 @@ def main():
     # Delete specific collection if requested
     if args.delete_collection:
         print(f"🗑️  Deleting collection: {args.delete_collection}")
-        store = QdrantVectorStore(collection_name=args.delete_collection)
+        store = QdrantVectorStore(collection_name=args.delete_collection, auto_create=False)
         store.delete_collection()
-        print(f"   ✅ Collection '{args.delete_collection}' deleted successfully")
-        print(f"   💡 You can now recreate it using: python scripts/create_embeddings.py --file <file_path> --type markdown")
+        print(f"   💡 You can now recreate it using: python scripts/create_embeddings.py --file <file_path>")
         return
     
     # Reset database if requested
@@ -608,7 +605,7 @@ def main():
         store = QdrantVectorStore(collection_name=collection_name)
         
         # Extract chunks
-        chunks, char_count = process_file(args.file, args.type)
+        chunks, char_count = process_file(args.file, 'markdown')
         print(f"✂️  Extracted {len(chunks)} chunks ({char_count} characters)")
         
         # Generate embeddings (batch)
