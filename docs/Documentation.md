@@ -169,14 +169,14 @@ The system now uses **two separate collections** for better organization and sem
 python scripts/convert_yaml_to_md.py
 
 # Generate embeddings for resume data (stored in "resume_data" collection)
-python scripts/create_embeddings.py --file data/resume_ale.md --type markdown
+python scripts/create_embeddings.py --file data/resume_ale.md
 
 # Generate embeddings for personality data (stored in "personality" collection)
-python scripts/create_embeddings.py --file data/personalities_16.md --type markdown
+python scripts/create_embeddings.py --file data/personalities_16.md
 
 # Manual collection targeting (optional - auto-detection works by default)
-python scripts/create_embeddings.py --file data/resume_ale.md --type markdown --collection resume_data
-python scripts/create_embeddings.py --file data/personalities_16.md --type markdown --collection personality
+python scripts/create_embeddings.py --file data/resume_ale.md --collection resume_data
+python scripts/create_embeddings.py --file data/personalities_16.md --collection personality
 
 # Check current database state (shows counts for both collections)
 python scripts/create_embeddings.py
@@ -200,7 +200,7 @@ python scripts/create_embeddings.py
 #   projects: 6 documents        ✓ Still present
 
 # Rebuild only the personality collection
-python scripts/create_embeddings.py --file data/personalities_16.md --type markdown
+python scripts/create_embeddings.py --file data/personalities_16.md
 
 # Verify rebuild complete
 python scripts/create_embeddings.py
@@ -221,7 +221,7 @@ python scripts/create_embeddings.py
 python scripts/create_embeddings.py --delete_collection resume_data
 
 # Recreate with new data
-python scripts/create_embeddings.py --file data/resume_ale.md --type markdown
+python scripts/create_embeddings.py --file data/resume_ale.md
 ```
 
 ---
@@ -235,13 +235,13 @@ When you need to reset BOTH collections (recommended for major changes):
 python scripts/create_embeddings.py --reset
 
 # Step 2: Rebuild resume_data collection
-python scripts/create_embeddings.py --file data/resume_ale.md --type markdown
+python scripts/create_embeddings.py --file data/resume_ale.md
 
 # Step 3: Rebuild personality collection
-python scripts/create_embeddings.py --file data/personalities_16.md --type markdown
+python scripts/create_embeddings.py --file data/personalities_16.md
 
 # Step 4: Rebuild projects collection
-python scripts/create_embeddings.py --file data/portfolio_projects.md --type markdown
+python scripts/create_embeddings.py --file data/portfolio_projects.md
 
 # Step 5: Verify the rebuild
 python scripts/create_embeddings.py
@@ -365,7 +365,7 @@ When updating your resume or other source files:
 python scripts/create_embeddings.py --delete_collection resume_data
 
 # 3. Re-process with fresh embeddings
-python scripts/create_embeddings.py --file data/resume_ale.md --type markdown
+python scripts/create_embeddings.py --file data/resume_ale.md
 
 # 4. Verify no duplicates
 python scripts/create_embeddings.py  # Check document count
