@@ -271,6 +271,106 @@ python scripts/create_embeddings.py
 
 **Example Scenario:** If dates are stored incorrectly (e.g., `"March"` instead of `"March-2025"`), you must reset the database after fixing the parsing code. Simply re-running the script without `--reset` will create duplicate entries with the old corrupted data still present.
 
+#### Re-processing Files and Duplicate Prevention
+
+**Important:** When you re-process an existing file, embeddings are **ADDED** as duplicates rather than replaced. This is a critical behavior to understand.
+
+**What Happens When You Re-process a File**
+
+If you run the embedding script twice on the same file without resetting:
+
+```bash
+# First run
+$ python scripts/create_embeddings.py --file data/resume_ale.md --type markdown
+# Creates 50 documents with random UUIDs
+
+# Second run (same file)
+$ python scripts/create_embeddings.py --file data/resume_ale.md --type markdown
+# Creates 50 MORE documents with different random UUIDs
+# Result: 100 total documents (50 duplicates)
+```
+
+**Why This Happens**
+
+The `add_documents()` method in [`src/core/vector_store.py`](src/core/vector_store.py) generates a **random UUID for each document**:
+
+```python
+point = PointStruct(
+    id=str(uuid.uuid4()),  # ← New unique ID generated each run
+    vector=embedding,
+    payload={...}
+)
+```
+
+While Qdrant's `upsert()` operation would replace documents with matching IDs, the system creates new UUIDs every run, so duplicates accumulate instead of replacing.
+
+**Impact on Search Results**
+
+Duplicate embeddings degrade search quality:
+
+```python
+results = store.search(query_vector, top_k=10)
+# May return:
+# - "Built ETL pipeline..." (score: 0.95)
+# - "Built ETL pipeline..." (score: 0.95)  # Duplicate!
+```
+
+**How to Avoid Duplicates**
+
+**Option 1: Delete Collection Before Re-processing (Recommended)**
+```bash
+# Delete old embeddings
+python scripts/create_embeddings.py --delete_collection resume_data
+
+# Re-process with fresh data
+python scripts/create_embeddings.py --file data/resume_ale.md --type markdown
+```
+
+**Option 2: Complete Database Reset**
+```bash
+# Reset entire database
+python scripts/create_embeddings.py --reset
+
+# Rebuild all collections
+python scripts/create_embeddings.py --file data/resume_ale.md --type markdown
+python scripts/create_embeddings.py --file data/personalities_16.md --type markdown
+python scripts/create_embeddings.py --file data/portfolio_projects.md --type markdown
+```
+
+**Option 3: Implement Deterministic IDs (Future Enhancement)**
+Generate hash-based IDs from content to enable true replacement:
+
+```python
+import hashlib
+
+# Generate ID from content hash (same content = same ID)
+point_id = hashlib.sha256(
+    f"{chunk['content']}{chunk['metadata']}".encode()
+).hexdigest()[:32]
+
+point = PointStruct(
+    id=point_id,  # ← Same content = same ID = auto-replacement
+    vector=embedding,
+    payload={...}
+)
+```
+
+**Best Practice Workflow**
+
+When updating your resume or other source files:
+
+```bash
+# 1. Update the source markdown/YAML
+# 2. Delete the collection to avoid duplicates
+python scripts/create_embeddings.py --delete_collection resume_data
+
+# 3. Re-process with fresh embeddings
+python scripts/create_embeddings.py --file data/resume_ale.md --type markdown
+
+# 4. Verify no duplicates
+python scripts/create_embeddings.py  # Check document count
+```
+
 #### Programmatic Usage
 
 **Working with Resume Data Collection:**
