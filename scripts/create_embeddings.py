@@ -331,7 +331,9 @@ class MarkdownParser:
         3
         """
         chunks = []
-        projects = content.split('\n# ')[1:]  # Split by project headers
+        # Prepend newline to handle first project that starts at line 1
+        # Result: ["\n", "Project A\n...", "Project B\n..."][1:] = ["Project A\n...", "Project B\n..."]
+        projects = ('\n' + content).split('\n# ')[1:]
         
         for idx, project in enumerate(projects):
             lines = project.strip().split('\n')
