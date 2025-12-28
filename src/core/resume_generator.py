@@ -1108,7 +1108,7 @@ def create_cover_letter_prompt(resume_data: Dict[str, Any], job_analysis: Dict[s
     {json.dumps(job_analysis['keywords'])}
     </keywords>
 
-    Structure the cover letter in 3 short paragraphs (opening, body, closing), under 250 words total:
+    Structure the cover letter in 3 short and concise paragraphs (opening, body, closing), under 250 words total:
         - Opening: Demonstrate why you are interested in the role and company and how your skills solve industry challenges or specific problems mentioned in the job summary.
         - Body: Highlight soft skills matching job requirements, naturally include in relevant personality traits and reference 1-2 portfolio projects to demonstrate skill.
         - Closing: Reiterate enthusiasm for the role, summarize key qualifications, and include a call to action for next steps.
@@ -1507,7 +1507,7 @@ def _add_cover_letter_section(doc: Document, cover_letter: Dict[str, Any], resum
     date.add_run(datetime.now().strftime('%B %d, %Y'))
 
     # Add space after the date
-    date.paragraph_format.space_after = Pt(24)
+    date.paragraph_format.space_after = Pt(12)
     
     # Recipient info (Company name)    
     recipient = doc.add_paragraph()
@@ -1515,7 +1515,7 @@ def _add_cover_letter_section(doc: Document, cover_letter: Dict[str, Any], resum
     recipient.add_run(company)
     recipient.paragraph_format.space_after = Pt(24)
     
-    # Greeting
+    # Greeting (Hiring Manager)
     greeting = doc.add_paragraph()
     greeting.alignment = WD_ALIGN_PARAGRAPH.LEFT
     greeting.add_run(hiring_manager_greeting)
@@ -1549,23 +1549,32 @@ def _add_cover_letter_section(doc: Document, cover_letter: Dict[str, Any], resum
     if portfolio_projects and portfolio_projects.get('projects_for_list') and len(portfolio_projects['projects_for_list']) > 0:
         projects_header = doc.add_paragraph()
         projects_header.alignment = WD_ALIGN_PARAGRAPH.LEFT
-        projects_header.add_run("Here is a list of relevant portfolio projects:")
+        header_run = projects_header.add_run("P.S. Here is a list of relevant portfolio projects:")
+        header_run.font.size = Pt(10)
         projects_header.paragraph_format.space_after = Pt(6)
         
-        for project in portfolio_projects['projects_for_list']:
+        for idx, project in enumerate(portfolio_projects['projects_for_list'], 1):
             # Project title and URL
-            project_item = doc.add_paragraph()
-            project_item.alignment = WD_ALIGN_PARAGRAPH.LEFT
-            project_item.add_run(f"- {project['title']}: {project['url']}")
-            project_item.paragraph_format.space_after = Pt(2)
-            project_item.paragraph_format.left_indent = Inches(0.25)
+            title_para = doc.add_paragraph()
+            title_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            title_run = title_para.add_run(f"{idx}. {project['title']}: ")
+            title_run.font.size = Pt(10)
+            title_run.bold = True
+            url_run = title_para.add_run(project['url'])
+            url_run.font.size = Pt(10)
+            url_run.font.color.rgb = RGBColor(23, 54, 93)
+            title_para.paragraph_format.space_after = Pt(2)
+            
             # Add tech stack
             tech_stack_text = ", ".join(project['tech_stack'])
-            project_item = doc.add_paragraph()
-            project_item.alignment = WD_ALIGN_PARAGRAPH.LEFT
-            tech_run = project_item.add_run(f"Tech Stack: {tech_stack_text}")
-            project_item.paragraph_format.space_after = Pt(6)
-            project_item.paragraph_format.left_indent = Inches(0.25)
+            tech_para = doc.add_paragraph()
+            tech_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            tech_label_run = tech_para.add_run("Tech Stack: ")
+            tech_label_run.font.size = Pt(10)
+            tech_run = tech_para.add_run(f"{tech_stack_text}")
+            tech_run.font.size = Pt(10)
+            tech_para.paragraph_format.space_after = Pt(6)
+            tech_para.paragraph_format.left_indent = Inches(0.25)
 
 
 def create_resume_document(resume: Dict[str, Any], resume_ale: Dict[str, Any]) -> Document:
