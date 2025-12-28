@@ -608,7 +608,7 @@ def retrieve_portfolio_projects_hierarchical(
     job_analysis: Dict[str, Any],
     top_k_technical: int = 10,
     top_k_prompt: int = 3,
-    top_k_list: int = 5
+    top_k_list: int = 4
 ) -> Dict[str, Any]:
     """
     Retrieve portfolio projects using two-step hierarchical search.
@@ -1565,16 +1565,18 @@ def _add_cover_letter_section(doc: Document, cover_letter: Dict[str, Any], resum
             url_run.font.color.rgb = RGBColor(23, 54, 93)
             title_para.paragraph_format.space_after = Pt(2)
             
-            # Add tech stack
-            tech_stack_text = ", ".join(project['tech_stack'])
-            tech_para = doc.add_paragraph()
-            tech_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
-            tech_label_run = tech_para.add_run("Tech Stack: ")
-            tech_label_run.font.size = Pt(10)
-            tech_run = tech_para.add_run(f"{tech_stack_text}")
-            tech_run.font.size = Pt(10)
-            tech_para.paragraph_format.space_after = Pt(6)
-            tech_para.paragraph_format.left_indent = Inches(0.25)
+            # Add tech stack (with defensive access to handle malformed data)
+            tech_stack = project.get('tech_stack', [])
+            if tech_stack:
+                tech_stack_text = ", ".join(tech_stack)
+                tech_para = doc.add_paragraph()
+                tech_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                tech_label_run = tech_para.add_run("Tech Stack: ")
+                tech_label_run.font.size = Pt(10)
+                tech_run = tech_para.add_run(f"{tech_stack_text}")
+                tech_run.font.size = Pt(10)
+                tech_para.paragraph_format.space_after = Pt(6)
+                tech_para.paragraph_format.left_indent = Inches(0.25)
 
 
 def create_resume_document(resume: Dict[str, Any], resume_ale: Dict[str, Any]) -> Document:

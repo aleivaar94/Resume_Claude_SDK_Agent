@@ -116,7 +116,7 @@ async def scrape_job_tool(args: Dict[str, Any]) -> Dict[str, Any]:
         print(f"[scrape_job_tool] Success: {job_dict.get('job_title', 'N/A')} at {job_dict.get('company_name', 'N/A')}")
         return {
             "content": [
-                {"type": "text", "text": json.dumps(job_dict, indent=2)}
+                {"type": "text", "text": json.dumps(job_dict, indent=2, ensure_ascii=True)}
             ]
         }
     except Exception as e:
@@ -254,7 +254,7 @@ async def get_portfolio_projects_tool(args: Dict[str, Any]) -> Dict[str, Any]:
         
         # Get optional parameters
         top_k_prompt = args.get("top_k_prompt", 3)
-        top_k_list = args.get("top_k_list", 5)
+        top_k_list = args.get("top_k_list", 4)
         
         print(f"[get_portfolio_projects_tool] Retrieving projects with top_k_prompt={top_k_prompt}, top_k_list={top_k_list}")
         
@@ -269,7 +269,7 @@ async def get_portfolio_projects_tool(args: Dict[str, Any]) -> Dict[str, Any]:
         # Return as JSON string
         return {
             "content": [
-                {"type": "text", "text": json.dumps(result, indent=2)}
+                {"type": "text", "text": json.dumps(result, indent=2, ensure_ascii=True)}
             ]
         }
     
@@ -345,7 +345,7 @@ async def analyze_job_tool(args: Dict[str, Any]) -> Dict[str, Any]:
         print(f"[analyze_job_tool] Success - found {len(result.get('technical_skills', []))} technical skills")
         return {
             "content": [
-                {"type": "text", "text": json.dumps(result, indent=2)}
+                {"type": "text", "text": json.dumps(result, indent=2, ensure_ascii=True)}
             ]
         }
     except Exception as e:
@@ -439,7 +439,7 @@ async def generate_resume_content_tool(args: Dict[str, Any]) -> Dict[str, Any]:
         
         return {
             "content": [
-                {"type": "text", "text": json.dumps(combined_output, indent=2)}
+                {"type": "text", "text": json.dumps(combined_output, indent=2, ensure_ascii=True)}
             ]
         }
     except json.JSONDecodeError as e:
@@ -541,14 +541,30 @@ async def generate_cover_letter_content_tool(args: Dict[str, Any]) -> Dict[str, 
         # Return ONLY the cover letter content (flat structure with 3 paragraph keys)
         return {
             "content": [
-                {"type": "text", "text": json.dumps(result, indent=2)}
+                {"type": "text", "text": json.dumps(result, indent=2, ensure_ascii=True)}
             ]
         }
     except json.JSONDecodeError as e:
-        print(f"[generate_cover_letter_content_tool] JSON Parse Error: {str(e)}")
+        # Provide detailed debug info for JSON parsing failures
+        error_pos = e.pos if hasattr(e, 'pos') else 'unknown'
+        error_msg = str(e)
+        
+        # Try to identify which input is problematic
+        debug_info = []
+        for key in ['resume_generated_json', 'job_analysis_json', 'portfolio_projects_json']:
+            if key in args and args[key]:
+                try:
+                    json.loads(args[key])
+                    debug_info.append(f"{key}: OK")
+                except json.JSONDecodeError as parse_err:
+                    debug_info.append(f"{key}: FAILED at position {parse_err.pos}")
+        
+        print(f"[generate_cover_letter_content_tool] JSON Parse Error: {error_msg}")
+        print(f"[generate_cover_letter_content_tool] Debug: {', '.join(debug_info)}")
+        
         return {
             "content": [
-                {"type": "text", "text": f"Error parsing JSON inputs: {str(e)}. Make sure to pass the exact JSON output from previous tools."}
+                {"type": "text", "text": f"Error parsing JSON inputs at position {error_pos}: {error_msg}. Debug: {', '.join(debug_info)}. Please ensure all JSON strings from previous tools are passed exactly as received."}
             ],
             "is_error": True
         }
