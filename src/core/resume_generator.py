@@ -1309,7 +1309,6 @@ def _add_resume_section(doc: Document, resume: Dict[str, Any], resume_ale: Dict[
     - Work experience uses tab stops for right-aligned dates
     - Bullet points are indented 0.15 inches
     - Section headers are centered and bold
-    - Phone number: 778.223.8536
     
     Examples
     --------
@@ -1338,10 +1337,6 @@ def _add_resume_section(doc: Document, resume: Dict[str, Any], resume_ale: Dict[
     github_run = contact.add_run(resume_ale['personal_information']['github'])
     github_run.font.size = Pt(10)
     github_run.font.color.rgb = RGBColor(23, 54, 93)
-    separator_run = contact.add_run(' | ')
-    phone_run = contact.add_run("778.223.8536")
-    phone_run.font.size = Pt(10)
-    phone_run.font.color.rgb = RGBColor(23, 54, 93)
     
     # Professional summary
     summary = doc.add_paragraph()
@@ -1467,7 +1462,6 @@ def _add_cover_letter_section(doc: Document, cover_letter: Dict[str, Any], resum
     - Three paragraphs: opening, body, closing (12pt spacing between)
     - Signature includes "Sincerely," and candidate name
     - Portfolio projects list appears after signature if projects_for_list exists
-    - Phone number: 778.223.8536
     
     Examples
     --------
@@ -1496,10 +1490,6 @@ def _add_cover_letter_section(doc: Document, cover_letter: Dict[str, Any], resum
     github_run = contact.add_run(resume_ale['personal_information']['github'])
     github_run.font.size = Pt(10)
     github_run.font.color.rgb = RGBColor(23, 54, 93)
-    separator_run = contact.add_run(' | ')
-    phone_run = contact.add_run("778.223.8536")
-    phone_run.font.size = Pt(10)
-    phone_run.font.color.rgb = RGBColor(23, 54, 93)
 
     # Current Date
     date = doc.add_paragraph()
