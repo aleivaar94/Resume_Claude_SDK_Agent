@@ -223,8 +223,8 @@ async def get_personality_traits_tool(args: Dict[str, Any]) -> Dict[str, Any]:
 
 @tool(
     "get_portfolio_projects",
-    "Retrieve relevant portfolio projects using two-step hierarchical search. Pass job_analysis as JSON string. Returns projects for prompt (top 3 with full content) and list (top 5 with title+URL).",
-    {"job_analysis_json": str, "top_k_prompt": int, "top_k_list": int}
+    "Retrieve relevant portfolio projects using two-step hierarchical search. Pass job_analysis as JSON string. Returns projects for prompt (with full content) and list (with title+URL).",
+    {"job_analysis_json": str}
 )
 async def get_portfolio_projects_tool(args: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -232,7 +232,7 @@ async def get_portfolio_projects_tool(args: Dict[str, Any]) -> Dict[str, Any]:
     
     Step 1: Searches technical summary chunks for top 10 matches.
     Step 2: Fetches full content for top 3 projects (for cover letter prompt) 
-            and metadata for top 5 projects (for cover letter list).
+            and metadata for top 4 projects (for cover letter list).
     
     Parameters
     ----------
@@ -243,7 +243,7 @@ async def get_portfolio_projects_tool(args: Dict[str, Any]) -> Dict[str, Any]:
         - top_k_prompt : int, optional
             Number of full projects to return for prompt (default: 3).
         - top_k_list : int, optional
-            Number of projects to return for list (default: 5).
+            Number of projects to return for list (default: 4).
     
     Returns
     -------
@@ -256,7 +256,7 @@ async def get_portfolio_projects_tool(args: Dict[str, Any]) -> Dict[str, Any]:
     {
         "job_analysis_json": "{\"technical_skills\": [\"Python\", \"Pandas\"], \"keywords\": [\"ETL\", \"data pipeline\"]}",
         "top_k_prompt": 3,
-        "top_k_list": 5
+        "top_k_list": 4
     }
     
     Output:
@@ -272,18 +272,13 @@ async def get_portfolio_projects_tool(args: Dict[str, Any]) -> Dict[str, Any]:
         job_analysis_json = args["job_analysis_json"]
         job_analysis = json.loads(job_analysis_json)
         
-        # Get optional parameters
-        top_k_prompt = args.get("top_k_prompt", 3)
-        top_k_list = args.get("top_k_list", 4)
         
-        print(f"[get_portfolio_projects_tool] Retrieving projects with top_k_prompt={top_k_prompt}, top_k_list={top_k_list}")
+        print(f"[get_portfolio_projects_tool] Retrieving projects")
         
-        # Retrieve projects
+        # Retrieve projects. Uses default top_k_prompt, top_k_list
         result = retrieve_portfolio_projects_hierarchical(
             job_analysis=job_analysis,
-            top_k_technical=10,
-            top_k_prompt=top_k_prompt,
-            top_k_list=top_k_list
+            top_k_technical=10
         )
         
         # Return as JSON string

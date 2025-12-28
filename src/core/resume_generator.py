@@ -614,7 +614,7 @@ def retrieve_portfolio_projects_hierarchical(
     Retrieve portfolio projects using two-step hierarchical search.
     
     Step 1: Query technical summary chunks to get top 10 technically relevant projects.
-    Step 2: Fetch full content for top 3 (for cover letter prompt) and metadata for top 5 (for list).
+    Step 2: Fetch full content for top 3 (for cover letter prompt) and metadata for top 4 (for list).
     
     Parameters
     ----------
@@ -625,14 +625,14 @@ def retrieve_portfolio_projects_hierarchical(
     top_k_prompt : int, optional
         Number of full projects to include in cover letter prompt (default: 3).
     top_k_list : int, optional
-        Number of projects to list at end of cover letter (default: 5).
+        Number of projects to list at end of cover letter (default: 4).
     
     Returns
     -------
     Dict[str, Any]
         {
             "projects_for_prompt": List[Dict] with title, content, url (top 3),
-            "projects_for_list": List[Dict] with title, url (top 5)
+            "projects_for_list": List[Dict] with title, url (top 4)
         }
     
     Examples
@@ -645,7 +645,7 @@ def retrieve_portfolio_projects_hierarchical(
     >>> len(result["projects_for_prompt"])
     3
     >>> len(result["projects_for_list"])
-    5
+    4
     >>> print(result["projects_for_prompt"][0]["title"])
     'Credit Card Offer Analysis'
     """
