@@ -2,6 +2,8 @@ import os
 import json
 from datetime import datetime
 from typing import Dict, Any, List
+from pathlib import Path
+import chainlit as cl
 from claude_agent_sdk import tool
 from src.integrations.brightdata import extract_job
 from src.core.resume_generator import (
@@ -114,6 +116,24 @@ async def scrape_job_tool(args: Dict[str, Any]) -> Dict[str, Any]:
         job_dict, _ = extract_job(url, api_key, platform=platform)
         
         print(f"[scrape_job_tool] Success: {job_dict.get('job_title', 'N/A')} at {job_dict.get('company_name', 'N/A')}")
+        
+        # Save job posting JSON to output folder
+        output_dir = Path("output")
+        output_dir.mkdir(exist_ok=True)
+        
+        # Create filename with job title, company, and timestamp
+        job_title_safe = job_dict.get('job_title', 'Unknown_Job').replace(' ', '_').replace('/', '_')
+        company_safe = job_dict.get('company_name', 'Unknown_Company').replace(' ', '_').replace('/', '_')
+        timestamp = datetime.now().strftime('%Y_%m_%d')
+        filename = f"{job_title_safe}_{company_safe}_{timestamp}.json"
+        filepath = output_dir / filename
+        
+        # Save JSON file
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(job_dict, f, indent=2, ensure_ascii=False)
+        
+        print(f"[scrape_job_tool] Saved job posting to: {filepath}")
+        
         return {
             "content": [
                 {"type": "text", "text": json.dumps(job_dict, indent=2, ensure_ascii=True)}
@@ -716,13 +736,20 @@ async def create_documents_tool(args: Dict[str, Any]) -> Dict[str, Any]:
         pdf_path = convert_word_to_pdf(doc_path)
         print(f"[create_documents_tool] PDF created: {pdf_path}")
         
+        # Store file paths in Chainlit session for download buttons
+        abs_word_path = os.path.abspath(doc_path)
+        abs_pdf_path = os.path.abspath(pdf_path)
+        cl.user_session.set("generated_word_path", abs_word_path)
+        cl.user_session.set("generated_pdf_path", abs_pdf_path)
+        print(f"[create_documents_tool] Stored paths in session: {abs_word_path}, {abs_pdf_path}")
+        
         return {
             "content": [
                 {"type": "text", "text": json.dumps({
                     "message": message,
                     "document_type": document_type,
-                    "word_path": os.path.abspath(doc_path),
-                    "pdf_path": os.path.abspath(pdf_path)
+                    "word_path": abs_word_path,
+                    "pdf_path": abs_pdf_path
                 }, indent=2)}
             ]
         }

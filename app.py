@@ -72,8 +72,8 @@ You are an expert Resume AI Agent that generates tailored resumes and cover lett
 7. **get_portfolio_projects** - Retrieve relevant portfolio projects
    Input: job_analysis_json (from analyze_job)
    Returns: {
-     "projects_for_prompt": [{"title": "...", "content": "...", "url": "..."}],  // 3 projects with full content
-     "projects_for_list": [{"title": "...", "url": "...", "tech_stack": [...]}]   // 5 projects with tech_stack array
+     "projects_for_prompt": [{"title": "...", "content": "...", "url": "..."}],
+     "projects_for_list": [{"title": "...", "url": "...", "tech_stack": [...]}] 
    }
    - projects_for_prompt: has "content" field (no tech_stack)
    - projects_for_list: has "tech_stack" field (no content)
@@ -273,6 +273,10 @@ async def main(message: cl.Message):
     # Reset stop flag for new message
     cl.user_session.set("stop_requested", False)
     
+    # Clear any previous file paths from session
+    cl.user_session.set("generated_word_path", None)
+    cl.user_session.set("generated_pdf_path", None)
+    
     msg = cl.Message(content="")
     await msg.send()
     
@@ -339,49 +343,33 @@ async def main(message: cl.Message):
         except Exception:
             pass
 
-    # Check for file paths in the response to create download buttons
+    # Check for file paths in session to create download buttons
     elements = []
     
-    # Look for the DOWNLOAD_FILES: line with word_path and pdf_path
-    download_pattern = r'DOWNLOAD_FILES:\s*word_path="([^"]+)"\s*pdf_path="([^"]+)"'
-    match = re.search(download_pattern, full_response)
+    # Retrieve file paths from session (stored by create_documents_tool)
+    word_path = cl.user_session.get("generated_word_path")
+    pdf_path = cl.user_session.get("generated_pdf_path")
     
-    if match:
-        word_path = match.group(1)
-        pdf_path = match.group(2)
-        
-        # Add Word file if it exists
-        if os.path.exists(word_path):
-            elements.append(cl.File(
-                path=word_path,
-                name=os.path.basename(word_path),
-                display="inline"
-            ))
-        
-        # Add PDF file if it exists
-        if os.path.exists(pdf_path):
-            elements.append(cl.File(
-                path=pdf_path,
-                name=os.path.basename(pdf_path),
-                display="inline"
-            ))
-    else:
-        # Fallback: Find file paths using regex if DOWNLOAD_FILES format not found
-        # Find .docx paths
-        docx_matches = re.findall(r'(?:[a-zA-Z]:\\[\w\-. \\]+\.docx|output[/\\][\w\-. ]+\.docx)', full_response)
-        for path in docx_matches:
-            clean_path = path.strip().replace('\\\\', '\\')
-            if os.path.exists(clean_path):
-                if not any(e.path == clean_path for e in elements):
-                    elements.append(cl.File(path=clean_path, name=os.path.basename(clean_path), display="inline"))
-
-        # Find .pdf paths
-        pdf_matches = re.findall(r'(?:[a-zA-Z]:\\[\w\-. \\]+\.pdf|output[/\\][\w\-. ]+\.pdf)', full_response)
-        for path in pdf_matches:
-            clean_path = path.strip().replace('\\\\', '\\')
-            if os.path.exists(clean_path):
-                if not any(e.path == clean_path for e in elements):
-                    elements.append(cl.File(path=clean_path, name=os.path.basename(clean_path), display="inline"))
-            
+    # Add Word file if path exists in session and file is accessible
+    if word_path and os.path.exists(word_path):
+        elements.append(cl.File(
+            path=word_path,
+            name=os.path.basename(word_path),
+            display="inline"
+        ))
+        print(f"[main] Added Word file to download: {word_path}")
+    
+    # Add PDF file if path exists in session and file is accessible
+    if pdf_path and os.path.exists(pdf_path):
+        elements.append(cl.File(
+            path=pdf_path,
+            name=os.path.basename(pdf_path),
+            display="inline"
+        ))
+        print(f"[main] Added PDF file to download: {pdf_path}")
+    
+    # Display download message with file buttons if files were created
     if elements:
         await cl.Message(content="📥 **Download your documents:**", elements=elements).send()
+    else:
+        print("[main] No file paths found in session - download buttons not displayed")
