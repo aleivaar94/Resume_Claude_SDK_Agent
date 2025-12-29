@@ -8,6 +8,8 @@ Usage
 -----
 python scripts/create_embeddings.py --file data/resume_ale.md
 python scripts/create_embeddings.py --file data/personalities_16.md
+python scripts/create_embeddings.py --file data/portfolio_projects.md
+python scripts/create_embeddings.py --delete_collection personality  # Delete specific collection
 python scripts/create_embeddings.py --reset  # Reset and rebuild entire database
 """
 
