@@ -76,7 +76,7 @@ async def scrape_job_tool(args: Dict[str, Any]) -> Dict[str, Any]:
     args : Dict[str, Any]
         Dictionary containing:
         - url : str
-            The job posting URL (LinkedIn or Indeed) OR a BrightData snapshot ID (starts with 's_').
+            The job posting URL (LinkedIn or Indeed) OR a BrightData snapshot ID (starts with 's_' or 'sd_').
         - platform : str, optional
             Platform identifier ('linkedin' or 'indeed'). Required when using snapshot ID.
     
@@ -106,7 +106,7 @@ async def scrape_job_tool(args: Dict[str, Any]) -> Dict[str, Any]:
     api_key = get_brightdata_key()
     
     try:
-        is_snapshot_id = url.startswith("s_")
+        is_snapshot_id = url.startswith("s_") or url.startswith("sd_")
         if is_snapshot_id:
             print(f"[scrape_job_tool] Retrieving job from snapshot ID: {url} (platform: {platform})")
         else:

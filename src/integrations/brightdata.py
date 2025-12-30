@@ -203,9 +203,7 @@ def extract_job_info_linkedin(json_output):
         'company_url': job.get('company_url'),
         'job_posted_date': job.get('job_posted_date'),
         # Extract job poster details as separate fields
-        'job_poster_name': job.get('job_poster', {}).get('name'),
-        'job_poster_title': job.get('job_poster', {}).get('title'),
-        'job_poster_url': job.get('job_poster', {}).get('url'),
+        'job_poster': job.get('job_poster')
     }
     # Convert result dictionary to DataFrame
     result_df = pd.DataFrame([result])
@@ -262,8 +260,8 @@ def extract_job(
     job_url_or_snapshot_id: str, 
     api_key: str, 
     platform: Optional[Literal["linkedin", "indeed"]] = None,
-    max_retries: int = 360, 
-    wait_time: int = 5
+    max_retries: int = 180, 
+    wait_time: int = 10
 ) -> tuple[dict, pd.DataFrame]:
     """
     Orchestrates the full job scraping process for LinkedIn or Indeed using Bright Data API.
@@ -275,7 +273,7 @@ def extract_job(
     Parameters
     ----------
     job_url_or_snapshot_id : str
-        The URL of the job posting OR a BrightData snapshot ID (starting with 's_').
+        The URL of the job posting OR a BrightData snapshot ID (starting with 's_' or 'sd_').
     api_key : str
         Bright Data API key.
     platform : Optional[Literal["linkedin", "indeed"]], optional
@@ -304,7 +302,7 @@ def extract_job(
     >>> job_dict, job_df = extract_job("s_mjepdfj94zb4miakd", api_key, platform="linkedin")
     """
     # Detect if input is snapshot ID or URL
-    is_snapshot_id = job_url_or_snapshot_id.startswith("s_")
+    is_snapshot_id = job_url_or_snapshot_id.startswith("s_") or job_url_or_snapshot_id.startswith("sd_")
     
     if is_snapshot_id:
         # Snapshot ID flow - platform must be specified
