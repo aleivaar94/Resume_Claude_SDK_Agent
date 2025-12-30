@@ -10,10 +10,10 @@ Reflekt is an AI agent that generates tailored resumes and cover letters by anal
 
 <figure>
   <img src="assets/images/Reflekt_1.0.gif" alt="Alt text" width="700"/>
-  <figcaption>Reflekt AI Agent</figcaption>
 </figure>
 
-This project builds upon the first version of the Resume generator I made, which was a simple AI automation with a Streamlit interface. You can find the LinkedIn posts [here](https://www.linkedin.com/posts/activity-7318293543297458176-UPuD?utm_source=share&utm_medium=member_desktop&rcm=ACoAAA2BJpgBEZ_SUWo4zpVHkx9hYA8UBl3Wfew) and [here](https://www.linkedin.com/posts/activity-7325897273341542400-2kUd?utm_source=share&utm_medium=member_desktop&rcm=ACoAAA2BJpgBEZ_SUWo4zpVHkx9hYA8UBl3Wfew)
+
+This project builds upon the first version of the Resume generator I made (below), which was a simple AI automation with a Streamlit interface. You can find the LinkedIn posts [here](https://www.linkedin.com/posts/activity-7318293543297458176-UPuD?utm_source=share&utm_medium=member_desktop&rcm=ACoAAA2BJpgBEZ_SUWo4zpVHkx9hYA8UBl3Wfew) and [here](https://www.linkedin.com/posts/activity-7325897273341542400-2kUd?utm_source=share&utm_medium=member_desktop&rcm=ACoAAA2BJpgBEZ_SUWo4zpVHkx9hYA8UBl3Wfew)
 
 <figure>
   <img src="assets/images/Resume_AI_1.0.gif" alt="Alt text" width="500"/>
