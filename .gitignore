@@ -8,3 +8,6 @@ output/
 *.docx
 *.pdf
 vector_db/
+archive/
+docs/JSON_Parse_Error.md
+docs/notes.md
