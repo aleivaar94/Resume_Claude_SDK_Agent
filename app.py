@@ -14,8 +14,9 @@ from src.agent.tools import (
     create_documents_tool
 )
 
-# Ensure API key is set for the SDK
-if not os.getenv("ANTHROPIC_API_KEY") and os.getenv("CLAUDE_API_KEY"):
+# Use CLAUDE_API_KEY for the SDK
+# CLAUDE SDK expects ANTHROPIC_API_KEY environment variable
+if os.getenv("CLAUDE_API_KEY"):
     os.environ["ANTHROPIC_API_KEY"] = os.getenv("CLAUDE_API_KEY")
 
 # Create the MCP server
