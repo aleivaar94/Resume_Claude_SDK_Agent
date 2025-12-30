@@ -8,10 +8,14 @@ pronounced ree-FLEKT
 
 Reflekt is an AI agent that generates tailored resumes and cover letters by analyzing job postings from LinkedIn and Indeed. It uses RAG (Retrieval-Augmented Generation) with Claude Agent SDK, OpenAI embeddings, and Qdrant vector database, to match your resume,  personality traits and portfolio projects, with the job requirements.
 
+See the LinkedIn post [here](https://www.linkedin.com/posts/activity-7411627532262969344-HfWO?utm_source=share&utm_medium=member_desktop&rcm=ACoAAA2BJpgBEZ_SUWo4zpVHkx9hYA8UBl3Wfew)
+
 <figure>
   <img src="assets/images/Reflekt_1.0.gif" alt="Alt text" width="700"/>
+  <figcaption>Reflekt: AI Agent Resume and Cover Letter Generator</figcaption>
 </figure>
 
+<br>
 
 This project builds upon the first version of the Resume generator I made (below), which was a simple AI automation with a Streamlit interface. You can find the LinkedIn posts [here](https://www.linkedin.com/posts/activity-7318293543297458176-UPuD?utm_source=share&utm_medium=member_desktop&rcm=ACoAAA2BJpgBEZ_SUWo4zpVHkx9hYA8UBl3Wfew) and [here](https://www.linkedin.com/posts/activity-7325897273341542400-2kUd?utm_source=share&utm_medium=member_desktop&rcm=ACoAAA2BJpgBEZ_SUWo4zpVHkx9hYA8UBl3Wfew)
 
